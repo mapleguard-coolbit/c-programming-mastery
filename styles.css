@@ -1449,7 +1449,6 @@ a:hover { color: var(--accent-dim); }
         transition-duration: 0.01ms !important;
     }
 }
-
 .CodeMirror {
     height: auto;
     min-height: 250px;
