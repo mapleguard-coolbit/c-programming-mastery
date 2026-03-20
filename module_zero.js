@@ -206,3 +206,5 @@ gcc myprogram.c -o myprogram
         }
     ]
 };
+
+window.ModuleZero = ModuleZero;
