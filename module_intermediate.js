@@ -1,5 +1,5 @@
 const ModuleIntermediate = {
-    description: "Bridging the gap: Advanced operator logic, multi-dimensional data structures, recursion, and understanding how variables live in memory. This is where C stops being a calculator and starts being a systems language.",
+    description: "Bridging the gap: Advanced operator logic, multi-dimensional data structures, recursion, and understanding how variables live in memory. Plus C23 essentials: constexpr, nullptr, binary literals, _BitInt, and typed enumerations.",
     
     lessons: [
         {
@@ -376,6 +376,223 @@ int main() {
                     tip: "Use <code>assert()</code> freely during development. If a function receives a NULL pointer it was never supposed to receive, that's a programming bug — not a runtime error the function should handle gracefully. Assert it. The crash and the message will immediately point you to the problem. This is far better than silently proceeding with bad data and crashing somewhere unrelated 200 lines later."
                 }
             ]
+        },
+        {
+            id: "c23-core",
+            title: "C23: constexpr, nullptr, Binary Literals, _BitInt",
+            explanation: "C23 is the most significant update to C in over a decade. It introduces proper compile-time constants with <code>constexpr</code>, a typed null pointer constant <code>nullptr</code>, binary integer literals, digit separators for readability, and bit-precise integer types with <code>_BitInt</code>. These aren't cosmetic changes — they fix longstanding design weaknesses in the language.",
+            sections: [
+                {
+                    title: "constexpr: True Compile-Time Constants",
+                    content: "Before C23, the only way to create a named integer constant usable in array sizes, <code>case</code> labels, and <code>_Static_assert</code> was via <code>#define</code> (no type) or <code>enum</code> (integers only, awkward for other types). C23 adds <code>constexpr</code>, giving you a typed, scoped, debuggable compile-time constant. It can be used everywhere an integer constant expression is required.",
+                    code: `#include <stdio.h>
+
+// C23: typed, scoped constants — unlike #define, these have a type
+// and show up properly in debuggers
+constexpr int    BUFFER_SIZE = 1024;
+constexpr double PI          = 3.14159265358979;
+constexpr int    MAX_USERS   = 100;
+
+// Can be used in array sizes (compile-time constant):
+char buffer[BUFFER_SIZE];
+
+// Can be used in case labels:
+int classify_buffer(int size) {
+    switch (size) {
+        case BUFFER_SIZE: return 1;   // Valid — constexpr is an ICE
+        default:          return 0;
+    }
+}
+
+// Can be used in _Static_assert:
+_Static_assert(BUFFER_SIZE > 0, "Buffer must be positive");
+_Static_assert(MAX_USERS  <= 1000, "Too many users");
+
+int main(void) {
+    printf("Buffer size: %d\\n", BUFFER_SIZE);
+    printf("Pi:          %.5f\\n", PI);
+    printf("Max users:   %d\\n", MAX_USERS);
+
+    // constexpr in a function — block scope
+    constexpr int LOCAL_MAX = 50;
+    int arr[LOCAL_MAX];
+    printf("Local array size: %d\\n", LOCAL_MAX);
+    (void)arr;
+    return 0;
+}`,
+                    output: `Buffer size: 1024
+Pi:          3.14159
+Max users:   100
+Local array size: 50`,
+                    tip: "Prefer <code>constexpr</code> over <code>#define</code> for constants in new C23 code. A <code>#define</code> is a text substitution with no type, no scope, and no visibility in the debugger. <code>constexpr</code> is a real typed variable that happens to be evaluated at compile time."
+                },
+                {
+                    title: "nullptr and nullptr_t (C23)",
+                    content: "Before C23, C had no typed null pointer constant. <code>NULL</code> was typically defined as <code>((void*)0)</code> or just <code>0</code>, which is an integer — causing subtle problems in overloaded contexts and <code>_Generic</code> expressions. C23 introduces <code>nullptr</code>, a keyword with its own type <code>nullptr_t</code>, which converts to any pointer type but is distinct from integer zero.",
+                    code: `#include <stdio.h>
+#include <stddef.h>   // nullptr_t
+
+// nullptr converts to any pointer type
+int* find_value(int *arr, int size, int target) {
+    for (int i = 0; i < size; i++) {
+        if (arr[i] == target) return &arr[i];
+    }
+    return nullptr;   // C23: typed, unambiguous null pointer
+}
+
+// nullptr_t is a distinct type — useful in _Generic
+#define describe_ptr(P) _Generic((P),        \\
+    nullptr_t: "null pointer constant",       \\
+    int*:      "int pointer",                 \\
+    char*:     "char pointer",                \\
+    default:   "other pointer"               \\
+)
+
+int main(void) {
+    int data[] = {10, 20, 30, 40, 50};
+
+    int *found = find_value(data, 5, 30);
+    if (found != nullptr) {
+        printf("Found: %d\\n", *found);
+    }
+
+    int *missing = find_value(data, 5, 99);
+    if (missing == nullptr) {
+        printf("Not found\\n");
+    }
+
+    // _Generic can now distinguish nullptr from int*
+    printf("nullptr is: %s\\n", describe_ptr(nullptr));
+    printf("int* is:    %s\\n", describe_ptr((int*)nullptr));
+    return 0;
+}`,
+                    output: `Found: 30
+Not found
+nullptr is: null pointer constant
+int* is:    int pointer`
+                },
+                {
+                    title: "Binary Literals and Digit Separators (C23)",
+                    content: "C23 adds two readability features for numeric literals. Binary literals use the <code>0b</code> or <code>0B</code> prefix (like most modern languages). Digit separators allow single quotes (<code>'</code>) between digits in any numeric literal — ignored by the compiler, purely for human readability.",
+                    code: `#include <stdio.h>
+
+int main(void) {
+    // Binary literals (C23) — much clearer than hex for bit patterns
+    unsigned char flags      = 0b10110100;
+    unsigned int  permission = 0b111101101;  // rwxr-xr--
+    unsigned int  mask       = 0b11110000;
+
+    printf("flags:      0x%02X (%d)\\n", flags, flags);
+    printf("permission: 0%o (octal)\\n", permission);
+    printf("mask:       0b%08b (%d)\\n", mask, mask);
+
+    // Digit separators (C23) — ' is ignored, just for readability
+    long long  population  = 8'100'000'000LL;   // 8.1 billion
+    double     speed_c     = 299'792'458.0;      // speed of light m/s
+    unsigned   hex_color   = 0xFF'A5'00;         // orange in RGB
+    unsigned   binary_byte = 0b1010'0101;        // nibble groups
+
+    printf("Population:  %lld\\n", population);
+    printf("Speed of c:  %.0f m/s\\n", speed_c);
+    printf("Orange:      #%06X\\n", hex_color);
+    printf("Binary byte: %u\\n", binary_byte);
+    return 0;
+}`,
+                    output: `flags:      0xB4 (180)
+permission: 0765 (octal)
+mask:       0b11110000 (240)
+Population:  8100000000
+Speed of c:  299792458 m/s
+Orange:      #FFA500
+Binary byte: 165`,
+                    tip: "Use digit separators whenever a large number would otherwise require counting digits. <code>8'100'000'000</code> is instantly readable as eight billion; <code>8100000000</code> requires counting. In binary literals, grouping by nibbles (<code>0b1010'0101</code>) makes bit patterns dramatically clearer."
+                },
+                {
+                    title: "_BitInt: Bit-Precise Integer Types (C23)",
+                    content: "Standard integer types (int, long, etc.) come in fixed sizes dictated by the platform. C23 introduces <code>_BitInt(N)</code> for integers of exactly N bits. This is essential for cryptography, hardware simulation, network protocol fields, and any domain where you need a specific bit width that doesn't happen to be 8, 16, 32, or 64.",
+                    code: `#include <stdio.h>
+#include <stdint.h>
+
+int main(void) {
+    // Exact bit widths — not available with standard types
+    unsigned _BitInt(3) u3 = 7;   // 3 bits: values 0-7
+    signed   _BitInt(3) s3 = -4;  // 3 bits: values -4 to 3
+             _BitInt(3) s3b = 3;  // signed by default
+
+    printf("u3 = %u (3-bit unsigned max = 7)\\n", (unsigned)u3);
+    printf("s3 = %d (3-bit signed min = -4)\\n", (int)s3);
+
+    // Useful for packing protocol fields
+    unsigned _BitInt(4) nibble = 0b1010;
+    unsigned _BitInt(6) six_bit = 63;  // max for 6-bit unsigned
+    unsigned _BitInt(7) seven_bit = 100;
+
+    printf("nibble (4-bit): %u\\n",  (unsigned)nibble);
+    printf("6-bit max:      %u\\n",  (unsigned)six_bit);
+    printf("7-bit value:    %u\\n",  (unsigned)seven_bit);
+
+    // Overflow wraps within the bit width
+    unsigned _BitInt(4) overflow = 15 + 1;  // Wraps to 0
+    printf("4-bit 15+1:     %u\\n",  (unsigned)overflow);
+
+    // wb suffix for _BitInt literals (C23)
+    unsigned _BitInt(8) byte_val = 255wb;
+    printf("255wb:          %u\\n",  (unsigned)byte_val);
+    return 0;
+}`,
+                    output: `u3 = 7 (3-bit unsigned max = 7)
+s3 = -4 (3-bit signed min = -4)
+nibble (4-bit): 10
+6-bit max:      63
+7-bit value:    100
+4-bit 15+1:     0
+255wb:          255`,
+                    warning: "<code>_BitInt</code> types do not use standard format specifiers in <code>printf</code> — you must cast to a standard integer type first (<code>(unsigned)my_bitint</code>). Also, arithmetic on <code>_BitInt</code> types wraps at the specified bit width, not at the standard integer width."
+                },
+                {
+                    title: "Enhanced Enumerations (C23)",
+                    content: "C23 allows enumeration types to have an explicit underlying type, and allows enumeration constants outside the range of <code>signed int</code>. Before C23, all enum constants had to fit in a <code>signed int</code>, which was a crippling limitation for bit masks and large constant sets.",
+                    code: `#include <stdio.h>
+#include <stdint.h>
+
+// C23: explicit underlying type for enum
+// Underlying type is uint32_t — can hold values up to 4 billion
+enum Permission : uint32_t {
+    PERM_NONE    = 0,
+    PERM_READ    = 0x00000001,
+    PERM_WRITE   = 0x00000002,
+    PERM_EXEC    = 0x00000004,
+    PERM_DELETE  = 0x00000008,
+    PERM_ADMIN   = 0x80000000,   // Would fail pre-C23! Exceeds signed int
+    PERM_ALL     = 0xFFFFFFFF    // Same — now valid
+};
+
+// C23: enum constants larger than INT_MAX
+enum BigFlags : unsigned long long {
+    FLAG_LOW  = 1ULL,
+    FLAG_HIGH = 0x8000000000000000ULL   // 2^63 — impossible pre-C23
+};
+
+int main(void) {
+    enum Permission user_perms = PERM_READ | PERM_WRITE;
+
+    if (user_perms & PERM_READ)  printf("Can read\\n");
+    if (user_perms & PERM_WRITE) printf("Can write\\n");
+    if (!(user_perms & PERM_EXEC)) printf("Cannot execute\\n");
+
+    printf("PERM_ADMIN  = 0x%08X\\n", (uint32_t)PERM_ADMIN);
+    printf("PERM_ALL    = 0x%08X\\n", (uint32_t)PERM_ALL);
+    printf("FLAG_HIGH   = 0x%llX\\n", (unsigned long long)FLAG_HIGH);
+    return 0;
+}`,
+                    output: `Can read
+Can write
+Cannot execute
+PERM_ADMIN  = 0x80000000
+PERM_ALL    = 0xFFFFFFFF
+FLAG_HIGH   = 0x8000000000000000`
+                }
+            ]
         }
     ],
     
@@ -564,6 +781,41 @@ int main() {
             question: "assert() is disabled at compile time by defining:",
             options: ["NO_ASSERT", "ASSERT_OFF", "NDEBUG", "DISABLE_ASSERT"],
             answer: 2
+        },
+        {
+            question: "In C23, 'constexpr int N = 10;' differs from '#define N 10' because:",
+            options: [
+                "constexpr is only valid inside functions",
+                "constexpr has a type, scope, and shows in the debugger",
+                "constexpr values cannot be used in switch case labels",
+                "There is no practical difference"
+            ],
+            answer: 1
+        },
+        {
+            question: "What is the type of 'nullptr' in C23?",
+            options: ["void*", "int", "nullptr_t", "null_t"],
+            answer: 2
+        },
+        {
+            question: "Which C23 literal represents 255 in binary?",
+            options: ["0255", "255b", "0b11111111", "b11111111"],
+            answer: 2
+        },
+        {
+            question: "What does unsigned _BitInt(4) allow as its maximum value?",
+            options: ["4", "8", "15", "16"],
+            answer: 2
+        },
+        {
+            question: "In C23, 'enum Color : uint8_t { RED, GREEN, BLUE };' means:",
+            options: [
+                "The enum values are stored as pointers",
+                "The enum's underlying storage type is uint8_t",
+                "Only values 0-2 are allowed",
+                "The enum cannot be used in switch statements"
+            ],
+            answer: 1
         }
     ]
 };

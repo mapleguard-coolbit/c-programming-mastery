@@ -1,5 +1,5 @@
 const ModuleLowLevel = {
-    description: "The heart of C: Pointers. This module unlocks the true power of the language — direct memory manipulation. This is where most students struggle, and for good reason. Take your time. Re-read sections. Run the code. The confusion is normal and it does eventually click.",
+    description: "The heart of C: Pointers, dynamic memory, function pointers, and C11/C23 memory alignment with alignof, alignas, and _Static_assert. Direct memory manipulation plus the tools to verify your assumptions at compile time.",
     
     lessons: [
         {
@@ -364,6 +364,133 @@ int main() {
                     output: "Result: 15\nResult: 5"
                 }
             ]
+        },
+        {
+            id: "alignment-staticassert",
+            title: "Memory Alignment, alignas, alignof, and _Static_assert",
+            explanation: "Modern CPUs perform best — and sometimes only correctly — when data is aligned to specific byte boundaries. A <code>double</code> on a misaligned address is either slow (extra memory accesses) or a bus error on strict-alignment architectures. C11 and C23 give you the tools to query and control alignment: <code>alignof</code> to inspect, <code>alignas</code> to enforce, and <code>_Static_assert</code> to verify assumptions at compile time so mismatches are caught before they become runtime bugs.",
+            sections: [
+                {
+                    title: "alignof: Querying Alignment Requirements",
+                    content: "<code>alignof(T)</code> returns the alignment requirement of type <code>T</code> in bytes — always a power of two. This is the number of bytes by which any object of type <code>T</code> must be aligned. It's a compile-time constant expression.",
+                    code: `#include <stdio.h>
+#include <stddef.h>    // alignof, max_align_t
+#include <stdint.h>
+
+int main(void) {
+    // Print alignment requirements for common types
+    printf("char:        alignof = %zu\\n", alignof(char));
+    printf("short:       alignof = %zu\\n", alignof(short));
+    printf("int:         alignof = %zu\\n", alignof(int));
+    printf("long:        alignof = %zu\\n", alignof(long));
+    printf("long long:   alignof = %zu\\n", alignof(long long));
+    printf("float:       alignof = %zu\\n", alignof(float));
+    printf("double:      alignof = %zu\\n", alignof(double));
+    printf("long double: alignof = %zu\\n", alignof(long double));
+    printf("void*:       alignof = %zu\\n", alignof(void*));
+    printf("max_align_t: alignof = %zu\\n", alignof(max_align_t));
+
+    // alignof works on structs — returns the largest member alignment
+    struct Packet { char type; int length; double data; };
+    printf("\\nstruct Packet: alignof = %zu, sizeof = %zu\\n",
+           alignof(struct Packet), sizeof(struct Packet));
+    return 0;
+}`,
+                    output: `char:        alignof = 1
+short:       alignof = 2
+int:         alignof = 4
+long:        alignof = 8
+long long:   alignof = 8
+float:       alignof = 4
+double:      alignof = 8
+long double: alignof = 16
+void*:       alignof = 8
+max_align_t: alignof = 16
+
+struct Packet: alignof = 8, sizeof = 24`
+                },
+                {
+                    title: "alignas: Enforcing Alignment (C11/C23)",
+                    content: "<code>alignas(N)</code> forces a variable or struct member to be aligned to at least N bytes. Common use cases: SIMD buffers that must be 16- or 32-byte aligned, cache-line padding to avoid false sharing in multithreaded code, and DMA buffers for hardware.",
+                    code: `#include <stdio.h>
+#include <stddef.h>    // alignas, alignof
+
+// Force 16-byte alignment for SIMD operations
+alignas(16) float simd_buffer[4] = {1.0f, 2.0f, 3.0f, 4.0f};
+
+// Cache-line padding: align to 64 bytes to prevent false sharing
+// between threads accessing different parts of the same struct
+struct alignas(64) CacheAligned {
+    int counter;
+    char padding[60];  // Fills the rest of the cache line
+};
+
+// Stack variable with specific alignment
+void demo(void) {
+    alignas(32) double aligned_val = 3.14;
+    printf("aligned_val address: %p\\n", (void*)&aligned_val);
+    printf("aligned_val alignof: %zu\\n", alignof(aligned_val));
+    printf("Is 32-byte aligned:  %s\\n",
+           (uintptr_t)&aligned_val % 32 == 0 ? "yes" : "no");
+}
+
+int main(void) {
+    printf("simd_buffer address: %p\\n", (void*)simd_buffer);
+    printf("Is 16-byte aligned:  %s\\n",
+           (uintptr_t)simd_buffer % 16 == 0 ? "yes" : "no");
+    demo();
+    return 0;
+}`,
+                    output: `simd_buffer address: 0x...
+Is 16-byte aligned:  yes
+aligned_val address: 0x...
+aligned_val alignof: 8
+Is 32-byte aligned:  yes`,
+                    tip: "For heap allocation with specific alignment, use <code>aligned_alloc(alignment, size)</code> from <code>&lt;stdlib.h&gt;</code>. Plain <code>malloc</code> only guarantees alignment to <code>max_align_t</code> (typically 16 bytes on 64-bit systems)."
+                },
+                {
+                    title: "_Static_assert: Compile-Time Verification (C11/C23)",
+                    content: "<code>_Static_assert(condition, message)</code> checks a condition at compile time. If false, the build fails with your message. In C23 you can also write it as <code>static_assert</code> without including any header. It's the most powerful tool for encoding assumptions — if a platform change ever violates your assumption, you learn at compile time instead of at 3am during production.",
+                    code: `#include <stdio.h>
+#include <stdint.h>
+#include <stddef.h>
+
+// Verify assumptions about the target platform at compile time
+_Static_assert(sizeof(int)    == 4, "int must be 32 bits");
+_Static_assert(sizeof(void*)  == 8, "must be a 64-bit platform");
+_Static_assert(sizeof(char)   == 1, "char must be 1 byte");
+_Static_assert(CHAR_BIT       == 8, "must have 8-bit bytes");
+
+// Verify struct layout for binary protocol compatibility
+typedef struct {
+    uint8_t  version;   // 1 byte
+    uint8_t  flags;     // 1 byte
+    uint16_t length;    // 2 bytes
+    uint32_t sequence;  // 4 bytes
+} PacketHeader;
+
+_Static_assert(sizeof(PacketHeader) == 8,
+    "PacketHeader must be exactly 8 bytes for wire protocol");
+_Static_assert(alignof(PacketHeader) == 4,
+    "PacketHeader must be 4-byte aligned");
+_Static_assert(offsetof(PacketHeader, sequence) == 4,
+    "sequence field must be at offset 4");
+
+// C23: static_assert without a message is also valid
+static_assert(sizeof(uint64_t) == 8);
+
+int main(void) {
+    printf("All static assertions passed\\n");
+    printf("PacketHeader size:   %zu bytes\\n", sizeof(PacketHeader));
+    printf("sequence at offset:  %zu\\n", offsetof(PacketHeader, sequence));
+    return 0;
+}`,
+                    output: `All static assertions passed
+PacketHeader size:   8 bytes
+sequence at offset:  4`,
+                    warning: "Struct layout is not guaranteed unless the compiler is specifically told to pack it. Compilers insert padding between struct members for alignment. Use <code>offsetof</code> and <code>_Static_assert</code> together to verify wire-protocol struct layouts, especially when receiving data over the network or from files."
+                }
+            ]
         }
     ],
     
@@ -569,6 +696,31 @@ int main() {
         {
             question: "What does realloc(NULL, size) do?",
             options: ["Returns NULL", "Behaves like malloc(size)", "Crashes", "Frees memory"],
+            answer: 1
+        },
+        {
+            question: "What does alignof(double) return on a typical 64-bit system?",
+            options: ["4", "8", "16", "64"],
+            answer: 1
+        },
+        {
+            question: "_Static_assert(condition, message) fires:",
+            options: [
+                "At runtime when condition is false",
+                "At compile time when condition is false, halting the build",
+                "At link time",
+                "Only in debug builds"
+            ],
+            answer: 1
+        },
+        {
+            question: "alignas(16) on a variable means:",
+            options: [
+                "The variable takes 16 bytes",
+                "The variable's address is a multiple of 16",
+                "The variable is on the 16th stack frame",
+                "The variable is aligned to 16 bits"
+            ],
             answer: 1
         }
     ]

@@ -1,5 +1,5 @@
 const ModuleExtra = {
-    description: "The gaps: type casting, command-line arguments, const correctness, how loops work under the hood, atomics, and the standard library functions you'll actually use. Everything the main curriculum didn't have room for.",
+    description: "The gaps and C23 additions: type casting, command-line args, const correctness, atomics, the stdlib functions you'll actually use — plus C23's strdup, stdbit.h bit utilities, checked integer arithmetic, and memccpy.",
 
     lessons: [
         {
@@ -630,6 +630,201 @@ int main() {
                     warning: "Floating-point math is never exact. <code>0.1 + 0.2</code> in double precision is not exactly <code>0.3</code> — it's <code>0.30000000000000004</code>. Never compare floating-point results with <code>==</code>. Instead, check if the absolute difference is smaller than an acceptable tolerance: <code>if (fabs(a - b) < 1e-9)</code>. This also means <code>sqrt(x) * sqrt(x) == x</code> may be false for many values of x."
                 }
             ]
+        },
+        {
+            id: "c23-stdlib",
+            title: "C23 Standard Library Additions: strdup, stdbit.h, and Checked Arithmetic",
+            explanation: "C23 doesn't just add syntax — it adds substantial new standard library functionality. <code>strdup</code> and <code>strndup</code> are finally standard (they've been POSIX for decades but not part of C). <code>&lt;stdbit.h&gt;</code> standardizes bit-manipulation utilities previously implemented differently on every platform. And checked integer arithmetic macros let you detect overflow without undefined behavior.",
+            sections: [
+                {
+                    title: "strdup and strndup (C23)",
+                    content: "These functions duplicate a string by allocating memory and copying. They've existed on POSIX systems for decades but were non-standard extensions. C23 finally makes them part of the standard library. The returned pointer must be freed with <code>free()</code>.",
+                    code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int main(void) {
+    const char *original = "Hello, Modern C!";
+
+    // strdup: allocates strlen(s)+1 bytes and copies s
+    char *copy = strdup(original);
+    if (!copy) { perror("strdup"); return 1; }
+
+    printf("Original: %s\\n", original);
+    printf("Copy:     %s\\n", copy);
+    printf("Same ptr? %s\\n", original == copy ? "yes" : "no");
+
+    // Modify copy — original is unaffected
+    copy[7] = 'X';
+    printf("Modified: %s\\n", copy);
+    printf("Original: %s\\n", original);
+    free(copy);
+
+    // strndup: copies at most n bytes, always null-terminates
+    const char *long_str = "This is a very long string";
+    char *prefix = strndup(long_str, 7);  // "This is"
+    if (!prefix) { perror("strndup"); return 1; }
+    printf("\\nFirst 7 chars: '%s'\\n", prefix);
+    free(prefix);
+
+    return 0;
+}`,
+                    output: `Original: Hello, Modern C!
+Copy:     Hello, Modern C!
+Same ptr? no
+Modified: Hello, Xodern C!
+Original: Hello, Modern C!
+
+First 7 chars: 'This is'`,
+                    tip: "Always check the return value of <code>strdup</code> — it calls <code>malloc</code> internally and returns <code>NULL</code> on allocation failure. The allocated string must be freed exactly once. A common pattern: <code>char *s = strdup(input); if (!s) return ENOMEM;</code>"
+                },
+                {
+                    title: "<stdbit.h>: Standard Bit Utilities (C23)",
+                    content: "Before C23, counting bits, finding the highest set bit, or checking power-of-two status required hand-rolled implementations or compiler-specific builtins like GCC's <code>__builtin_popcount</code>. C23's <code>&lt;stdbit.h&gt;</code> standardizes these as portable, type-generic functions.",
+                    code: `#include <stdio.h>
+#include <stdbit.h>    // C23 bit utilities
+#include <stdint.h>
+
+int main(void) {
+    uint32_t x = 0b10110100110101001011010011010100;
+
+    // Count set bits (population count / Hamming weight)
+    printf("stdc_count_ones(x)     = %u\\n", stdc_count_ones(x));
+    printf("stdc_count_zeros(x)    = %u\\n", stdc_count_zeros(x));
+
+    // Leading/trailing zeros and ones
+    printf("stdc_leading_zeros(x)  = %u\\n", stdc_leading_zeros(x));
+    printf("stdc_trailing_zeros(x) = %u\\n", stdc_trailing_zeros(x));
+    printf("stdc_leading_ones(x)   = %u\\n", stdc_leading_ones(x));
+    printf("stdc_trailing_ones(x)  = %u\\n", stdc_trailing_ones(x));
+
+    // Bit width: position of highest set bit + 1
+    printf("stdc_bit_width(x)      = %u\\n", stdc_bit_width(x));
+
+    // Floor/ceil to power of two
+    uint32_t v = 100;
+    printf("\\nFor v = %u:\\n", v);
+    printf("stdc_bit_floor(v)      = %u\\n", stdc_bit_floor(v));   // 64
+    printf("stdc_bit_ceil(v)       = %u\\n", stdc_bit_ceil(v));    // 128
+
+    // Check power of two
+    printf("stdc_has_single_bit(64)  = %d\\n", stdc_has_single_bit(64u));
+    printf("stdc_has_single_bit(100) = %d\\n", stdc_has_single_bit(100u));
+
+    return 0;
+}`,
+                    output: `stdc_count_ones(x)     = 16
+stdc_count_zeros(x)    = 16
+stdc_leading_zeros(x)  = 0
+stdc_trailing_zeros(x) = 2
+stdc_leading_ones(x)   = 1
+stdc_trailing_ones(x)  = 0
+stdc_bit_width(x)      = 32
+
+For v = 100:
+stdc_bit_floor(v)      = 64
+stdc_bit_ceil(v)       = 128
+stdc_has_single_bit(64)  = 1
+stdc_has_single_bit(100) = 0`,
+                    tip: "These functions are type-generic — they work on any unsigned integer type. The compiler selects the right underlying implementation based on argument type. Before C23, you had to use <code>__builtin_popcount</code> for <code>int</code>, <code>__builtin_popcountl</code> for <code>long</code>, etc. Now one name handles all."
+                },
+                {
+                    title: "Checked Integer Arithmetic (C23)",
+                    content: "Signed integer overflow is undefined behavior in C. On any given platform it usually wraps, but the compiler is allowed to assume it never happens and optimize away overflow checks. C23 introduces checked arithmetic functions from <code>&lt;stdckdint.h&gt;</code> that perform arithmetic and report whether overflow occurred — without invoking undefined behavior.",
+                    code: `#include <stdio.h>
+#include <stdckdint.h>   // C23 checked arithmetic
+#include <limits.h>
+
+// Safe addition — returns true if overflow occurred
+bool safe_add_int(int a, int b, int *result) {
+    return ckd_add(result, a, b);  // returns true on overflow
+}
+
+int main(void) {
+    int result;
+
+    // Normal additions — no overflow
+    if (ckd_add(&result, 100, 200)) {
+        printf("100 + 200: OVERFLOW\\n");
+    } else {
+        printf("100 + 200 = %d  (no overflow)\\n", result);
+    }
+
+    // Overflow case: INT_MAX + 1
+    if (ckd_add(&result, INT_MAX, 1)) {
+        printf("INT_MAX + 1: OVERFLOW detected safely!\\n");
+        printf("  (result is: %d — but we know it overflowed)\\n", result);
+    } else {
+        printf("INT_MAX + 1 = %d\\n", result);
+    }
+
+    // ckd_sub and ckd_mul work the same way
+    if (ckd_mul(&result, 100000, 100000)) {
+        printf("100000 * 100000: OVERFLOW (exceeds INT_MAX = %d)\\n", INT_MAX);
+    } else {
+        printf("100000 * 100000 = %d\\n", result);
+    }
+
+    // Works across different integer types
+    long long big;
+    if (ckd_add(&big, (long long)INT_MAX, (long long)INT_MAX)) {
+        printf("INT_MAX + INT_MAX: OVERFLOW for long long\\n");
+    } else {
+        printf("INT_MAX + INT_MAX = %lld  (fits in long long)\\n", big);
+    }
+
+    return 0;
+}`,
+                    output: `100 + 200 = 300  (no overflow)
+INT_MAX + 1: OVERFLOW detected safely!
+  (result is: -2147483648 — but we know it overflowed)
+100000 * 100000: OVERFLOW (exceeds INT_MAX = 2147483647)
+INT_MAX + INT_MAX = 4294967294  (fits in long long)`,
+                    warning: "Before C23, detecting integer overflow required convoluted workarounds like <code>if (a > INT_MAX - b)</code> — which themselves are easy to get wrong. The <code>ckd_*</code> functions handle all the edge cases correctly including different types, and are guaranteed not to invoke undefined behavior even when overflow occurs. Use them whenever you need to verify arithmetic on untrusted input (network data, file sizes, user counts)."
+                },
+                {
+                    title: "memccpy and Other C23 String Improvements",
+                    content: "C23 also standardizes <code>memccpy</code> (copy until a byte is found), makes <code>gets</code> finally removed from the standard (it was already deprecated in C11), and clarifies the behavior of <code>strtok_r</code>. The <code>memccpy</code> function is particularly useful for efficiently copying with a sentinel byte.",
+                    code: `#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+int main(void) {
+    // memccpy: copy bytes until character c is found (or n bytes)
+    // Returns pointer to byte after c in dest, or NULL if c not found
+    char dest[64] = {0};
+    const char *src = "Hello, World! More text here";
+
+    // Copy up to and including the '!' character
+    char *end = memccpy(dest, src, '!', sizeof(dest));
+    if (end) {
+        *end = '\\0';   // Null-terminate after the found character
+        printf("Copied up to '!': %s\\n", dest);
+        printf("Remaining: %s\\n", src + (end - dest));
+    }
+
+    // Practical use: building a string token by token
+    char buffer[128] = {0};
+    char *pos = buffer;
+    size_t remaining = sizeof(buffer);
+
+    const char *words[] = {"Hello", " ", "World", NULL};
+    for (int i = 0; words[i]; i++) {
+        // Find the null terminator in each word and copy to it
+        char *next = memccpy(pos, words[i], '\\0', remaining);
+        if (!next) break;  // Buffer full
+        pos = next - 1;    // Back up over the null terminator
+        remaining = sizeof(buffer) - (size_t)(pos - buffer);
+    }
+    printf("Built string: '%s'\\n", buffer);
+
+    return 0;
+}`,
+                    output: `Copied up to '!': Hello, World!
+Remaining:  More text here
+Built string: 'Hello World'`
+                }
+            ]
         }
     ],
 
@@ -901,6 +1096,36 @@ int main() {
             question: "What does atoi return when given the string \"abc\"?",
             options: ["-1", "0 with no error indication", "Undefined behavior", "A compiler warning"],
             answer: 1
+        },
+        {
+            question: "What does strdup() return?",
+            options: [
+                "A pointer to the original string",
+                "A newly malloc'd copy of the string that must be freed",
+                "A static buffer containing the copy",
+                "The length of the string"
+            ],
+            answer: 1
+        },
+        {
+            question: "Which C23 header provides stdc_count_ones() and stdc_bit_ceil()?",
+            options: ["<stdlib.h>", "<stdint.h>", "<stdbit.h>", "<bitutils.h>"],
+            answer: 2
+        },
+        {
+            question: "ckd_add(&result, a, b) from <stdckdint.h> returns:",
+            options: [
+                "The sum a+b",
+                "true if overflow occurred, false otherwise",
+                "The number of bits that overflowed",
+                "A pointer to the result"
+            ],
+            answer: 1
+        },
+        {
+            question: "stdc_bit_ceil(100) returns:",
+            options: ["100", "64", "128", "256"],
+            answer: 2
         }
     ]
 };

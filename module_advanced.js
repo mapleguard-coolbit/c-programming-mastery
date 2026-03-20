@@ -1,5 +1,5 @@
 const ModuleAdvanced = {
-    description: "Structures, File I/O, and Preprocessors: organizing complex data, persisting it to disk, and controlling what the compiler even sees. This is where C programs start resembling real software.",
+    description: "Structures, File I/O, Preprocessors, and C23 attributes: [[nodiscard]], [[deprecated]], [[fallthrough]], [[maybe_unused]], and #embed. Organizing complex data, persisting it, and controlling what the compiler sees.",
     
     lessons: [
         {
@@ -702,6 +702,211 @@ void printStudent(Student s); // Prototype
 // typedef struct { ... } Student;`
                 }
             ]
+        },
+        {
+            id: "c23-attributes",
+            title: "C23 Standard Attributes: [[nodiscard]], [[deprecated]], [[fallthrough]], [[maybe_unused]]",
+            explanation: "C23 standardizes a portable attribute syntax using double square brackets. Attributes are annotations that convey intent to the compiler, enabling better warnings, clearer API contracts, and more aggressive optimization. Unlike GCC's <code>__attribute__((...))</code> extensions, standard attributes are part of the C language specification and work across all conforming compilers.",
+            sections: [
+                {
+                    title: "[[nodiscard]]: Enforce Return Value Checking",
+                    content: "<code>[[nodiscard]]</code> tells the compiler to warn whenever the return value of a function is discarded (ignored). This is essential for functions whose return value indicates success/failure or carries the allocated resource — silently ignoring these is a classic source of bugs.",
+                    code: `#include <stdio.h>
+#include <stdlib.h>
+
+// C23: compiler warns if return value is ignored
+[[nodiscard]]
+int connect_to_server(const char *host, int port) {
+    printf("Connecting to %s:%d...\\n", host, port);
+    return -1;  // -1 = error in this example
+}
+
+[[nodiscard("allocated memory must be freed")]]  // C23: with message
+void* create_buffer(size_t size) {
+    return malloc(size);
+}
+
+int main(void) {
+    // connect_to_server("localhost", 8080);  // WARN: discarded [[nodiscard]]
+
+    int status = connect_to_server("localhost", 8080);
+    if (status < 0) {
+        printf("Connection failed: %d\\n", status);
+    }
+
+    void *buf = create_buffer(1024);
+    if (!buf) {
+        printf("Allocation failed\\n");
+        return 1;
+    }
+    printf("Buffer allocated\\n");
+    free(buf);
+    return 0;
+}`,
+                    output: `Connecting to localhost:8080...
+Connection failed: -1
+Buffer allocated`,
+                    tip: "Apply <code>[[nodiscard]]</code> to any function where ignoring the return value is almost certainly a bug: memory allocators, file openers, error codes, handles, and locks. This turns a silent bug into a compiler warning — the best possible time to catch it."
+                },
+                {
+                    title: "[[deprecated]]: Mark Obsolete APIs",
+                    content: "<code>[[deprecated]]</code> marks a function, type, or variable as obsolete. Any use of it triggers a compiler warning, optionally with a message explaining what to use instead. This is how you evolve an API without breaking existing code while guiding users to the new version.",
+                    code: `#include <stdio.h>
+
+// Old API — deprecated, use new_process() instead
+[[deprecated("use new_process() with explicit flags instead")]]
+int old_process(int data) {
+    return data * 2;
+}
+
+// New API
+int new_process(int data, int flags) {
+    (void)flags;
+    return data * 2;
+}
+
+// Deprecated struct — compiler warns on use
+[[deprecated]]
+typedef struct { int x, y; } OldPoint;
+
+typedef struct { double x, y; } Point;  // New version
+
+int main(void) {
+    // Using deprecated functions triggers a warning at compile time:
+    // int r = old_process(10);  // warning: 'old_process' is deprecated
+
+    int result = new_process(10, 0);   // No warning
+    printf("Result: %d\\n", result);
+
+    Point p = {1.0, 2.0};
+    printf("Point: (%.1f, %.1f)\\n", p.x, p.y);
+    return 0;
+}`,
+                    output: `Result: 20
+Point: (1.0, 2.0)`
+                },
+                {
+                    title: "[[fallthrough]]: Explicit Switch Fallthrough",
+                    content: "Falling through a <code>switch</code> <code>case</code> without a <code>break</code> is almost always a bug — which is why modern compilers warn about it. But sometimes fallthrough is intentional. <code>[[fallthrough]]</code> is an explicit annotation that tells the compiler: 'yes, I meant to fall through here, this is not a mistake.'",
+                    code: `#include <stdio.h>
+
+// HTTP status code classifier
+void classify_status(int code) {
+    switch (code / 100) {
+        case 1:
+            printf("1xx: Informational\\n");
+            break;
+        case 2:
+            printf("2xx: Success\\n");
+            break;
+        case 3:
+            printf("3xx: Redirection\\n");
+            break;
+        case 4:
+            [[fallthrough]];   // C23: intentional fallthrough — no warning
+        case 5:
+            printf("%dxx: Error (%s)\\n", code / 100,
+                   code / 100 == 4 ? "client" : "server");
+            break;
+        default:
+            printf("Unknown status\\n");
+    }
+}
+
+int main(void) {
+    classify_status(200);
+    classify_status(301);
+    classify_status(404);  // Falls through to 5xx handler
+    classify_status(500);
+    return 0;
+}`,
+                    output: `2xx: Success
+3xx: Redirection
+4xx: Error (client)
+5xx: Error (server)`
+                },
+                {
+                    title: "[[maybe_unused]]: Suppress Unused Warnings",
+                    content: "<code>[[maybe_unused]]</code> suppresses warnings about unused variables, parameters, or functions. This is common in debug-only parameters, platform-specific code, and callback functions where the signature is fixed but not all parameters are always needed.",
+                    code: `#include <stdio.h>
+
+// Callback with a fixed signature — 'userdata' not always needed
+void on_click([[maybe_unused]] int x,
+              [[maybe_unused]] int y,
+              [[maybe_unused]] void *userdata) {
+    printf("Click event received\\n");
+    // x, y, userdata not used — no warning with [[maybe_unused]]
+}
+
+// Debug-only parameter
+void process(int value, [[maybe_unused]] const char *debug_label) {
+#ifdef DEBUG
+    printf("[%s] processing %d\\n", debug_label, value);
+#endif
+    // In release builds, debug_label is unused — no warning
+    printf("Processed: %d\\n", value * 2);
+}
+
+// Function used only in debug builds
+[[maybe_unused]]
+static void dump_state(int *arr, int n) {
+    for (int i = 0; i < n; i++) printf("%d ", arr[i]);
+    printf("\\n");
+}
+
+int main(void) {
+    on_click(100, 200, NULL);
+    process(21, "test-label");
+    return 0;
+}`,
+                    output: `Click event received
+Processed: 42`,
+                    tip: "The four standard attributes — <code>[[nodiscard]]</code>, <code>[[deprecated]]</code>, <code>[[fallthrough]]</code>, and <code>[[maybe_unused]]</code> — should be the first attributes you reach for in any new C23 codebase. They communicate intent to both the compiler and the reader without any runtime cost."
+                },
+                {
+                    title: "#embed: Embedding Binary Resources (C23)",
+                    content: "C23 introduces <code>#embed</code>, which lets you include the raw bytes of a file directly into your source code at compile time. Previously this required external tools (like <code>xxd</code> or custom scripts) to convert files into C arrays. Now you can embed fonts, images, shaders, certificates, or any binary data directly.",
+                    code: `#include <stdio.h>
+#include <stddef.h>
+
+// C23: embed a file's bytes as a byte array at compile time
+// This embeds the literal bytes of "logo.png" into the binary
+// const unsigned char logo_data[] = {
+//     #embed "logo.png"
+// };
+// const size_t logo_size = sizeof(logo_data);
+
+// For this example, we simulate what #embed does:
+const unsigned char icon_data[] = {
+    #embed "icon.bin"   // Real C23 — compiler includes file bytes
+    // Simulated equivalent (what the compiler would produce):
+    // 0x89, 0x50, 0x4E, 0x47, ...
+};
+
+// #embed with limits — take only first 64 bytes:
+// const unsigned char header[] = { #embed "file.bin" limit(64) };
+
+// #embed with a fallback if file doesn't exist:
+// #if __has_embed("cert.pem")
+//     const char cert[] = { #embed "cert.pem", 0 };  // null-terminate
+// #else
+//     #error "Certificate file required"
+// #endif
+
+int main(void) {
+    printf("Resource embedding with #embed (C23)\\n");
+    printf("Before #embed, developers used tools like xxd:\\n");
+    printf("  xxd -i logo.png > logo_data.h\\n");
+    printf("Now: just write  #embed \\"logo.png\\"  in an initializer.\\n");
+    return 0;
+}`,
+                    output: `Resource embedding with #embed (C23)
+Before #embed, developers used tools like xxd:
+  xxd -i logo.png > logo_data.h
+Now: just write  #embed "logo.png"  in an initializer.`,
+                    warning: "<code>#embed</code> requires C23 compiler support. Check with <code>__has_embed(\"file\")</code> before using it if portability matters. The file path is relative to the source file unless the compiler's include path overrides this. The embedded data is raw bytes — for text files, remember to add a null terminator if you need a C string."
+                }
+            ]
         }
     ],
     
@@ -917,6 +1122,46 @@ int main() {
         {
             question: "Which binary file I/O function reads raw bytes from a file?",
             options: ["fscanf", "fgets", "fread", "fgetc"],
+            answer: 2
+        },
+        {
+            question: "What does [[nodiscard]] do when applied to a function?",
+            options: [
+                "Prevents the function from being called",
+                "Causes a compiler warning if the return value is discarded",
+                "Makes the return value const",
+                "Forces the function to be inlined"
+            ],
+            answer: 1
+        },
+        {
+            question: "[[fallthrough]] is used in a switch statement to:",
+            options: [
+                "Skip to the default case",
+                "Exit the switch immediately",
+                "Explicitly signal intentional fallthrough to the next case, suppressing warnings",
+                "Force execution of all remaining cases"
+            ],
+            answer: 2
+        },
+        {
+            question: "What is the purpose of [[maybe_unused]]?",
+            options: [
+                "Marks a variable as potentially uninitialized",
+                "Suppresses compiler warnings about unused variables, parameters, or functions",
+                "Makes the variable optional at link time",
+                "Allows the variable to be optimized away at runtime"
+            ],
+            answer: 1
+        },
+        {
+            question: "What does C23's #embed directive do?",
+            options: [
+                "Embeds another C source file as code",
+                "Includes a header file with embedding semantics",
+                "Includes the raw bytes of a file as data in a byte array initializer",
+                "Embeds assembly instructions into C code"
+            ],
             answer: 2
         }
     ]

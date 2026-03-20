@@ -18,13 +18,13 @@ const App = {
 
 // ===== Module Registry =====
 const ModuleRegistry = {
-    beginner: window.ModuleBeginner || null,
+    beginner:          window.ModuleBeginner          || null,
     earlyIntermediate: window.ModuleEarlyIntermediate || null,
-    intermediate: window.ModuleIntermediate || null,
-    lowlevel: window.ModuleLowLevel || null,
-    advanced: window.ModuleAdvanced || null,
-    expert: window.ModuleExpert || null,
-    extra: window.ModuleExtra || null
+    intermediate:      window.ModuleIntermediate      || null,
+    lowlevel:          window.ModuleLowLevel          || null,
+    advanced:          window.ModuleAdvanced          || null,
+    expert:            window.ModuleExpert            || null,   // Bug fix: was ModuleExtra (wrong key)
+    extra:             window.ModuleExtra             || null
 };
 
 const ModuleOrder = ['beginner', 'earlyIntermediate', 'intermediate', 'lowlevel', 'advanced', 'expert', 'extra'];
@@ -114,6 +114,34 @@ function toggleTheme() {
     const next = current === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
     localStorage.setItem('cMasteryTheme', next);
+    // Bug fix: sync CodeMirror editor theme when toggling
+    if (editorInstance) {
+        editorInstance.setOption('theme', next === 'light' ? 'default' : 'dracula');
+    }
+}
+
+// Bug fix: copyCode was referenced but never defined
+function copyCode(btn) {
+    const codeBlock = btn.closest('.code-block');
+    const code = codeBlock.querySelector('code').textContent;
+    navigator.clipboard.writeText(code).then(() => {
+        const original = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = original; }, 1500);
+    }).catch(() => {
+        // Fallback for browsers without clipboard API
+        const ta = document.createElement('textarea');
+        ta.value = code;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        const original = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = original; }, 1500);
+    });
 }
 
 // ===== Navigation Rendering =====
@@ -658,7 +686,14 @@ function renderExamQuestions() {
 
 function selectExamOption(questionIndex, optionIndex) {
     App.examAnswers[questionIndex] = optionIndex;
-    renderExamQuestions();
+    // Bug fix: was calling renderExamQuestions() which rebuilt the entire DOM
+    // and reset scroll position. Now we just toggle CSS classes like the quiz does.
+    const allCards = document.querySelectorAll('#examContent .question-card');
+    const card = allCards[questionIndex];
+    if (!card) return;
+    card.querySelectorAll('.option-btn').forEach((btn, i) => {
+        btn.classList.toggle('selected', i === optionIndex);
+    });
 }
 
 function submitExam() {
