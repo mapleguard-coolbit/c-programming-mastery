@@ -914,52 +914,62 @@ Now: just write  #embed "logo.png"  in an initializer.`,
         {
             question: "What is the main difference between a struct and a union?",
             options: ["Syntax", "Struct members share memory, Union members don't", "Union members share memory, Struct members don't", "No difference"],
-            answer: 2
+            answer: 2,
+            explanation: "In a union, all members share the same memory — writing one member overwrites the others. In a struct, each member has its own memory location."
         },
         {
             question: "What operator is used to access a member via a struct pointer?",
             options: [".", "->", "::", "*"],
-            answer: 1
+            answer: 1,
+            explanation: "The arrow operator (->) is shorthand for (*ptr).member — dereference the pointer, then access the member. The dot operator (.) is for direct struct access."
         },
         {
             question: "What does 'w' mode do in fopen?",
             options: ["Reads file", "Writes to file (erases existing)", "Appends to file", "Writes to file (keeps existing)"],
-            answer: 1
+            answer: 1,
+            explanation: "'w' mode opens a file for writing. If it exists, all existing content is erased. If it doesn't exist, it's created."
         },
         {
             question: "When does the preprocessor run?",
             options: ["After compilation", "During runtime", "Before compilation", "During linking"],
-            answer: 2
+            answer: 2,
+            explanation: "The preprocessor runs before compilation — it handles #include, #define, and #ifdef before the compiler sees the code."
         },
         {
             question: "What is an enum?",
             options: ["A new variable type", "A list of named integer constants", "A type of struct", "A macro"],
-            answer: 1
+            answer: 1,
+            explanation: "An enum defines a set of named integer constants. The values default to 0, 1, 2... unless you assign them explicitly."
         },
         {
             question: "Why do we use fclose?",
             options: ["To delete the file", "To save changes and free memory", "To pause reading", "It is optional"],
-            answer: 1
+            answer: 1,
+            explanation: "fclose flushes any buffered output to disk and releases the file descriptor. Without it, the last bytes of a file may never be written."
         },
         {
             question: "What does typedef do?",
             options: ["Defines a new type", "Creates an alias for a type", "Deletes a type", "Checks type size"],
-            answer: 1
+            answer: 1,
+            explanation: "typedef creates an alias for an existing type. typedef struct Node Node; lets you write Node instead of struct Node throughout the code."
         },
         {
             question: "What does a struct designated initializer look like?",
             options: ["{name, age, gpa}", "{.name = val, .age = val}", "(name=val)", "[name: val]"],
-            answer: 1
+            answer: 1,
+            explanation: "Designated initializers use .field = value syntax. They initialize specific members by name, making the intent clear and order-independent."
         },
         {
             question: "Can you use == to compare two structs?",
             options: ["Yes, always", "Only if they are the same type", "No, you must compare fields individually", "Only with memcmp"],
-            answer: 2
+            answer: 2,
+            explanation: "No. == compares pointers (addresses), not struct contents. To compare structs, compare each field individually, or use memcmp if there's no padding."
         },
         {
             question: "What does __LINE__ contain?",
             options: ["The function name", "The current line number", "The file name", "The compile date"],
-            answer: 1
+            answer: 1,
+            explanation: "__LINE__ is a predefined macro that expands to the current source line number as an integer. Useful for debugging messages and assertions."
         }
     ],
     
@@ -1075,94 +1085,201 @@ int main() {
     
     exam: [
         {
-            question: "What is the size of a union with int (4 bytes) and double (8 bytes)?",
-            options: ["4 bytes", "8 bytes", "12 bytes", "2 bytes"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+typedef struct {
+    char name[8];
+    int  age;
+} Person;
+int main(void) {
+    Person p = {"Alice", 30};
+    printf("%s is %d\\n", p.name, p.age);
+    p.age++;
+    printf("%d\\n", p.age);
+    return 0;
+}`,
+            options: ["Alice is 30 then 31", "Alice is 30 then 30", "Alice is 31 then 31", "Compile error"],
+            answer: 0,
+            explanation: "Struct members are accessed with the dot operator. p.age starts at 30, p.age++ increments it to 31."
         },
         {
-            question: "fscanf is used for:",
-            options: ["Reading from keyboard", "Reading formatted data from file", "Writing to file", "Closing file"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+typedef union {
+    int   i;
+    float f;
+} Num;
+int main(void) {
+    Num n;
+    n.i = 0;
+    printf("%zu\\n", sizeof(n));
+    return 0;
+}`,
+            options: ["4", "8", "12", "2"],
+            answer: 1,
+            explanation: "A union's size equals its largest member's size. Both int and float are typically 4 bytes, so sizeof(Num) = 4. All members share the same memory."
         },
         {
-            question: "enum values are stored as:",
-            options: ["Strings", "Integers", "Floats", "Pointers"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#define DOUBLE(x) ((x) * 2)
+#define SQUARE(x) ((x) * (x))
+int main(void) {
+    printf("%d\\n", DOUBLE(3 + 1));
+    printf("%d\\n", SQUARE(3));
+    return 0;
+}`,
+            options: ["7 then 9", "8 then 9", "7 then 6", "8 then 6"],
+            answer: 1,
+            explanation: "DOUBLE(3+1) expands to ((3+1)*2) = 8. SQUARE(3) expands to ((3)*(3)) = 9. Parentheses in the macro prevent precedence bugs."
         },
         {
-            question: "Preprocessor directives end with:",
-            options: ["Semicolon", "Newline", "Hash", "Bracket"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+typedef struct Node {
+    int val;
+    struct Node *next;
+} Node;
+int main(void) {
+    Node a = {1, NULL};
+    Node b = {2, NULL};
+    a.next = &b;
+    printf("%d\\n", a.next->val);
+    printf("%d\\n", a.next->next == NULL);
+    return 0;
+}`,
+            options: ["2 then 1", "1 then 1", "2 then 0", "1 then 0"],
+            answer: 0,
+            explanation: "a.next points to b. a.next->val is b.val = 2. a.next->next is b.next which is NULL, so == NULL is true (1)."
         },
         {
-            question: "Which mode opens a file for reading AND writing without erasing it?",
-            options: ["\"r\"", "\"w+\"", "\"r+\"", "\"rw\""],
-            answer: 2
+            question: "What is the output?",
+            code: `#include <stdio.h>
+typedef enum { RED=0, GREEN, BLUE } Color;
+int main(void) {
+    Color c = GREEN;
+    printf("%d\\n", c);
+    printf("%d\\n", BLUE);
+    switch (c) {
+        case RED:   printf("red\\n");   break;
+        case GREEN: printf("green\\n"); break;
+        case BLUE:  printf("blue\\n");  break;
+    }
+    return 0;
+}`,
+            options: ["1 then 2 then green", "0 then 2 then green", "1 then 2 then blue", "1 then 3 then green"],
+            answer: 0,
+            explanation: "RED=0, GREEN=1 (auto-incremented), BLUE=2. c=GREEN prints as 1. BLUE prints as 2. The switch matches GREEN and prints 'green'."
         },
         {
-            question: "Structure padding is done for:",
-            options: ["Security", "Alignment", "Encryption", "Compression"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+typedef struct { int x; int y; double z; } T;
+int main(void) {
+    printf("%zu\\n", sizeof(T));
+    return 0;
+}`,
+            options: ["12", "16", "24", "10"],
+            answer: 1,
+            explanation: "Two ints (4+4=8 bytes) followed by a double (8 bytes, 8-byte aligned). The ints already reach a multiple-of-8 boundary, so no padding needed. Total: 16 bytes."
         },
         {
-            question: "What happens if you use a macro like SQUARE(x++)?",
-            options: ["x increments once", "x increments twice", "Compiler error", "Nothing"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+int main(void) {
+    int x = 3, y = 7;
+    printf("%d\\n", MAX(x, y));
+    printf("%d\\n", MAX(x + 1, y - 2));
+    return 0;
+}`,
+            options: ["7 then 5", "7 then 7", "3 then 5", "7 then 4"],
+            answer: 0,
+            explanation: "MAX(3,7): 3>7 is false → 7. MAX(4, 5): x+1=4, y-2=5, 4>5 is false → 5."
         },
         {
-            question: "typedef char* String; String s; What is s?",
-            options: ["A char", "A char pointer", "A struct", "An int"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+void cleanup(void) {
+    printf("bye\\n");
+}
+int main(void) {
+    atexit(cleanup);
+    printf("hello\\n");
+    return 0;
+}`,
+            options: ["hello", "bye", "hello then bye", "bye then hello"],
+            answer: 2,
+            explanation: "atexit registers a function to run when the program exits. main prints 'hello' first, then normal exit triggers cleanup() which prints 'bye'."
         },
         {
-            question: "What does atexit() do?",
-            options: ["Exits the program immediately", "Registers a function to call when the program exits", "Closes all open files", "Aborts the program"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    int x = 10;
+    switch (x) {
+        case 10: printf("ten\\n");
+        case 20: printf("twenty\\n"); break;
+        case 30: printf("thirty\\n"); break;
+    }
+    return 0;
+}`,
+            options: ["ten", "twenty", "ten then twenty", "ten then twenty then thirty"],
+            answer: 2,
+            explanation: "Case 10 matches and prints 'ten'. There is NO break after it, so execution falls through to case 20 and prints 'twenty'. The break there exits. This is fallthrough."
         },
         {
-            question: "Which binary file I/O function reads raw bytes from a file?",
-            options: ["fscanf", "fgets", "fread", "fgetc"],
-            answer: 2
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#ifdef DEBUG
+#define LOG(x) printf("DEBUG: %d\\n", x)
+#else
+#define LOG(x)
+#endif
+int main(void) {
+    int val = 42;
+    LOG(val);
+    printf("done\\n");
+    return 0;
+}`,
+            options: ["DEBUG: 42 then done", "done", "42 then done", "DEBUG: val then done"],
+            answer: 1,
+            explanation: "DEBUG is not defined, so LOG(x) expands to nothing. Only 'done' prints. If DEBUG were defined (e.g. -DDEBUG flag), 'DEBUG: 42' would also appear."
         },
         {
-            question: "What does [[nodiscard]] do when applied to a function?",
-            options: [
-                "Prevents the function from being called",
-                "Causes a compiler warning if the return value is discarded",
-                "Makes the return value const",
-                "Forces the function to be inlined"
-            ],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+typedef struct { int a; int b; } Pair;
+Pair make_pair(int x, int y) {
+    return (Pair){x, y};
+}
+int main(void) {
+    Pair p = make_pair(5, 10);
+    printf("%d %d\\n", p.a, p.b);
+    return 0;
+}`,
+            options: ["5 10", "10 5", "0 0", "Compile error"],
+            answer: 0,
+            explanation: "Structs can be returned by value and assigned. The compound literal (Pair){x, y} creates a Pair and returns it. p.a=5, p.b=10."
         },
         {
-            question: "[[fallthrough]] is used in a switch statement to:",
-            options: [
-                "Skip to the default case",
-                "Exit the switch immediately",
-                "Explicitly signal intentional fallthrough to the next case, suppressing warnings",
-                "Force execution of all remaining cases"
-            ],
-            answer: 2
-        },
-        {
-            question: "What is the purpose of [[maybe_unused]]?",
-            options: [
-                "Marks a variable as potentially uninitialized",
-                "Suppresses compiler warnings about unused variables, parameters, or functions",
-                "Makes the variable optional at link time",
-                "Allows the variable to be optimized away at runtime"
-            ],
-            answer: 1
-        },
-        {
-            question: "What does C23's #embed directive do?",
-            options: [
-                "Embeds another C source file as code",
-                "Includes a header file with embedding semantics",
-                "Includes the raw bytes of a file as data in a byte array initializer",
-                "Embeds assembly instructions into C code"
-            ],
-            answer: 2
+            question: "What does the [[nodiscard]] attribute cause here?",
+            code: `#include <stdio.h>
+#include <stdlib.h>
+[[nodiscard]]
+void* safe_malloc(size_t n) {
+    void *p = malloc(n);
+    if (!p) { fprintf(stderr, "OOM\\n"); exit(1); }
+    return p;
+}
+int main(void) {
+    safe_malloc(100);   // return value discarded
+    printf("ok\\n");
+    return 0;
+}`,
+            options: ["Compile error: cannot discard", "A compiler WARNING at the safe_malloc(100) call line", "Runs fine, no warning", "Crashes at runtime"],
+            answer: 1,
+            explanation: "[[nodiscard]] causes a compiler WARNING (not an error by default) when the return value is discarded. The program still compiles and runs — but the warning flags the likely memory leak."
         }
     ]
 };

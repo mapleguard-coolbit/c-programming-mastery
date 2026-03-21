@@ -832,42 +832,50 @@ Built string: 'Hello World'`
         {
             question: "What does `(float)a / b` do when a and b are both int?",
             options: ["Integer division", "Forces float division", "Rounds the result", "Causes a compiler error"],
-            answer: 1
+            answer: 1,
+            explanation: "(float)a casts a to float before the division, so the result is floating-point. Without the cast, int/int gives integer division."
         },
         {
             question: "In `int main(int argc, char *argv[])`, what is `argv[0]`?",
             options: ["The first user argument", "The program name", "The argument count", "Always NULL"],
-            answer: 1
+            answer: 1,
+            explanation: "argv[0] is always the program's name (or path). User-provided arguments start at argv[1]."
         },
         {
             question: "What does `const int *p` mean?",
             options: ["p cannot be reassigned", "The value at *p cannot be modified", "Both p and *p are const", "p must be initialized"],
-            answer: 1
+            answer: 1,
+            explanation: "const int *p means the int pointed to is read-only — you cannot write *p. The pointer p itself can be reassigned to point elsewhere."
         },
         {
             question: "What is the key difference between memcpy and memmove?",
             options: ["memcpy is for strings only", "memmove handles overlapping regions", "memcpy zeros memory first", "memmove is always faster"],
-            answer: 1
+            answer: 1,
+            explanation: "memmove handles overlapping source and destination regions correctly by copying through a temporary buffer. memcpy requires non-overlapping regions (declared restrict)."
         },
         {
             question: "What does loop unrolling do?",
             options: ["Removes the loop entirely", "Reduces the number of branch instructions", "Makes the loop run backwards", "Increases loop iterations"],
-            answer: 1
+            answer: 1,
+            explanation: "Loop unrolling copies the loop body multiple times to reduce the number of branch/increment instructions per iteration, improving throughput at the cost of code size."
         },
         {
             question: "What is a race condition?",
             options: ["A performance problem in loops", "A bug caused by two threads accessing shared data without synchronization", "A memory leak in threads", "A type mismatch error"],
-            answer: 1
+            answer: 1,
+            explanation: "A race condition occurs when two threads read and write shared data concurrently without synchronization, producing results that depend on thread scheduling timing."
         },
         {
             question: "Which function should you use instead of atoi for reliable error detection?",
             options: ["itoa", "strtol", "scanf", "sscanf"],
-            answer: 1
+            answer: 1,
+            explanation: "strtol returns the parsed value and sets endptr to point past the last consumed character, and sets errno on overflow. atoi silently returns 0 on any error."
         },
         {
             question: "What does `volatile` prevent the compiler from doing?",
             options: ["Writing to that variable", "Caching or reordering accesses to that variable", "Using that variable in expressions", "Allocating the variable on the stack"],
-            answer: 1
+            answer: 1,
+            explanation: "volatile prevents the compiler from caching the variable's value in a register or reordering accesses. Every read and write goes to the actual memory location."
         }
     ],
 
@@ -1048,84 +1056,193 @@ int main() {
 
     exam: [
         {
-            question: "What happens when you mix a signed int (-1) and unsigned int (1) in a comparison?",
-            options: ["Compiler error", "The signed value is converted to unsigned, -1 becomes a huge number", "The unsigned value is converted to signed", "Both are converted to float"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    int   a = 5, b = 2;
+    float result = (float)a / b;
+    printf("%.1f\\n", result);
+    printf("%d\\n", a / b);
+    return 0;
+}`,
+            options: ["2.5 then 2", "2.0 then 2", "2.5 then 3", "2.0 then 3"],
+            answer: 0,
+            explanation: "(float)a / b: a is cast to float before division, giving 2.5. a / b without cast is integer division: 2."
         },
         {
-            question: "What is argc when you run `./program hello world`?",
-            options: ["2", "3", "1", "0"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(int argc, char *argv[]) {
+    printf("%d\\n", argc);
+    printf("%s\\n", argv[0]);
+    return 0;
+}`,
+            options: ["0 then (empty)", "1 then program name", "2 then program name", "Undefined"],
+            answer: 1,
+            explanation: "When run with no extra arguments, argc == 1 (the program name counts). argv[0] is always the program name or path."
         },
         {
-            question: "What does `int * const p` mean?",
-            options: ["p points to a constant int", "p itself cannot be reassigned", "Both p and *p are constant", "p must be NULL"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    int x = 5;
+    int * const p = &x;
+    *p = 99;
+    printf("%d\\n", x);
+    // p = NULL;  // would be compile error: p is const
+    return 0;
+}`,
+            options: ["5", "99", "Compile error", "Undefined"],
+            answer: 1,
+            explanation: "int * const p: p itself cannot be reassigned, but *p can be modified. *p = 99 changes x to 99."
         },
         {
-            question: "What must be true before calling bsearch?",
-            options: ["Array must be allocated with malloc", "Array must be sorted in the same order as the comparator", "Array must contain unique values", "Array size must be a power of 2"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#include <string.h>
+int main(void) {
+    char s[] = "Hello World";
+    char *tok = strtok(s, " ");
+    while (tok) {
+        printf("%s\\n", tok);
+        tok = strtok(NULL, " ");
+    }
+    return 0;
+}`,
+            options: ["Hello World", "Hello then World", "H then e then l then l then o", "Hello\\nWorld"],
+            answer: 1,
+            explanation: "strtok splits on spaces. First call returns 'Hello', second returns 'World', third returns NULL ending the loop."
         },
         {
-            question: "Why is row-major array iteration faster than column-major?",
-            options: ["Fewer total iterations", "Better branch prediction", "Sequential access matches CPU cache line loading", "The compiler optimizes row-major automatically"],
-            answer: 2
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#include <string.h>
+int main(void) {
+    const char *path = "/usr/local/bin/gcc";
+    const char *file = strrchr(path, '/');
+    if (file) printf("%s\\n", file + 1);
+    printf("%zu\\n", strlen(path));
+    return 0;
+}`,
+            options: ["gcc then 18", "bin/gcc then 18", "gcc then 17", "/gcc then 18"],
+            answer: 0,
+            explanation: "strrchr finds the LAST '/'. file+1 skips it, giving 'gcc'. strlen counts all characters: /usr/local/bin/gcc = 18."
         },
         {
-            question: "What is the key limitation of atomic variables for thread synchronization?",
-            options: ["They are too slow for production use", "They only solve single-variable operations, not multi-step operations", "They require special hardware support", "They only work on integers"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#include <stdlib.h>
+int cmp(const void *a, const void *b) {
+    return *(int*)a - *(int*)b;
+}
+int main(void) {
+    int arr[] = {5, 2, 8, 1, 9, 3};
+    qsort(arr, 6, sizeof(int), cmp);
+    for (int i = 0; i < 6; i++) printf("%d ", arr[i]);
+    return 0;
+}`,
+            options: ["5 2 8 1 9 3", "1 2 3 5 8 9", "9 8 5 3 2 1", "1 3 2 5 8 9"],
+            answer: 1,
+            explanation: "qsort sorts in-place using the comparator. cmp returns negative if a<b, so ascending order. Result: 1 2 3 5 8 9."
         },
         {
-            question: "Why should you use `fabs` instead of `abs` for floating-point numbers?",
-            options: ["fabs is faster", "abs truncates to int first, producing wrong results", "abs is deprecated in C11", "fabs handles negative zero correctly"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#include <stdbit.h>
+int main(void) {
+    unsigned int x = 0b10110100;
+    printf("%u\\n", stdc_count_ones(x));
+    printf("%u\\n", stdc_bit_floor(100u));
+    printf("%u\\n", stdc_bit_ceil(100u));
+    return 0;
+}`,
+            options: ["4 then 64 then 128", "4 then 64 then 100", "4 then 128 then 128", "8 then 64 then 128"],
+            answer: 0,
+            explanation: "0b10110100 has 4 set bits. bit_floor(100) = largest power of 2 ≤ 100 = 64. bit_ceil(100) = smallest power of 2 ≥ 100 = 128."
         },
         {
-            question: "What does `volatile` NOT guarantee?",
-            options: ["Every read goes to actual memory", "Writes are not optimized away", "Atomicity and thread safety", "The variable is not cached in a register"],
-            answer: 2
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#include <stdckdint.h>
+#include <limits.h>
+int main(void) {
+    int result;
+    bool over1 = ckd_add(&result, 100, 200);
+    printf("%d %d\\n", over1, result);
+    bool over2 = ckd_add(&result, INT_MAX, 1);
+    printf("%d\\n", over2);
+    return 0;
+}`,
+            options: ["0 300 then 1", "1 300 then 0", "0 300 then 0", "1 300 then 1"],
+            answer: 0,
+            explanation: "100+200=300 fits in int: ckd_add returns false (0), result=300. INT_MAX+1 overflows: ckd_add returns true (1)."
         },
         {
-            question: "When is memmove required instead of memcpy?",
-            options: ["When copying more than 1024 bytes", "When source and destination might overlap", "When copying struct types", "When the pointer is volatile"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#include <stdlib.h>
+int main(void) {
+    char *s = strdup("Hello");
+    s[0] = 'J';
+    printf("%s\\n", s);
+    free(s);
+    return 0;
+}`,
+            options: ["Hello", "Jello", "Compile error", "Undefined behavior"],
+            answer: 1,
+            explanation: "strdup allocates a heap copy of 'Hello'. Unlike string literals, heap copies are writable. s[0]='J' changes it to 'Jello'."
         },
         {
-            question: "What does atoi return when given the string \"abc\"?",
-            options: ["-1", "0 with no error indication", "Undefined behavior", "A compiler warning"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#include <stdatomic.h>
+int main(void) {
+    _Atomic int counter = 0;
+    atomic_fetch_add(&counter, 5);
+    atomic_fetch_add(&counter, 3);
+    printf("%d\\n", atomic_load(&counter));
+    int expected = 8;
+    bool swapped = atomic_compare_exchange_strong(&counter, &expected, 100);
+    printf("%d %d\\n", swapped, (int)counter);
+    return 0;
+}`,
+            options: ["8 then 1 100", "8 then 0 8", "0 then 1 100", "8 then 1 8"],
+            answer: 0,
+            explanation: "After two fetch_adds, counter=8. CAS: expected==counter (both 8), so swap succeeds (returns true=1), counter becomes 100."
         },
         {
-            question: "What does strdup() return?",
-            options: [
-                "A pointer to the original string",
-                "A newly malloc'd copy of the string that must be freed",
-                "A static buffer containing the copy",
-                "The length of the string"
-            ],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#include <math.h>
+int main(void) {
+    printf("%.4f\\n", fabs(-3.14));
+    printf("%.4f\\n", floor(3.9));
+    printf("%.4f\\n", ceil(3.1));
+    printf("%.4f\\n", round(3.5));
+    return 0;
+}`,
+            options: ["3.1400 then 3.0000 then 4.0000 then 4.0000",
+                      "3.1400 then 4.0000 then 3.0000 then 4.0000",
+                      "-3.1400 then 3.0000 then 4.0000 then 4.0000",
+                      "3.1400 then 3.0000 then 4.0000 then 3.0000"],
+            answer: 0,
+            explanation: "fabs absolute value: 3.1400. floor rounds down: 3.0. ceil rounds up: 4.0. round rounds to nearest (0.5 rounds up): 4.0."
         },
         {
-            question: "Which C23 header provides stdc_count_ones() and stdc_bit_ceil()?",
-            options: ["<stdlib.h>", "<stdint.h>", "<stdbit.h>", "<bitutils.h>"],
-            answer: 2
-        },
-        {
-            question: "ckd_add(&result, a, b) from <stdckdint.h> returns:",
-            options: [
-                "The sum a+b",
-                "true if overflow occurred, false otherwise",
-                "The number of bits that overflowed",
-                "A pointer to the result"
-            ],
-            answer: 1
-        },
-        {
-            question: "stdc_bit_ceil(100) returns:",
-            options: ["100", "64", "128", "256"],
-            answer: 2
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#include <string.h>
+int main(void) {
+    char dest[20] = {0};
+    memcpy(dest, "Hello", 5);
+    memmove(dest + 2, dest, 5);
+    dest[7] = '\\0';
+    printf("%s\\n", dest);
+    return 0;
+}`,
+            options: ["Hello", "HeHello", "HoHell", "HeHelllo"],
+            answer: 1,
+            explanation: "After memcpy: dest = 'Hello'. memmove(dest+2, dest, 5) copies 5 bytes from start into offset 2 (overlapping, so memmove is safe): dest = 'HeHello'. Null at 7."
         }
     ]
 };

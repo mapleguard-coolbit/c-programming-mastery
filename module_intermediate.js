@@ -600,57 +600,68 @@ FLAG_HIGH   = 0x8000000000000000`
         {
             question: "What does the ternary operator return?",
             options: ["Boolean only", "One of two values", "Nothing", "A pointer"],
-            answer: 1
+            answer: 1,
+            explanation: "The ternary operator (condition ? a : b) is an expression that evaluates to one of two values. It returns a value, unlike an if statement."
         },
         {
             question: "What is 5 << 1 in bitwise operations?",
             options: ["5", "10", "2", "1"],
-            answer: 1
+            answer: 1,
+            explanation: "Left-shift by 1 multiplies by 2 (each bit moves one position toward more-significant). 5 in binary is 101; shifted left: 1010 = 10."
         },
         {
             question: "In a 2D array `arr[3][4]`, how many columns does it have?",
             options: ["3", "4", "7", "12"],
-            answer: 1
+            answer: 1,
+            explanation: "arr[3][4] declares 3 rows and 4 columns. The first dimension is rows, the second is columns."
         },
         {
             question: "What happens if a recursive function has no base case?",
             options: ["Returns 0", "Stack Overflow", "Syntax Error", "Infinite Loop"],
-            answer: 1
+            answer: 1,
+            explanation: "Without a base case, recursion never stops — the function keeps calling itself until it exhausts the call stack (stack overflow)."
         },
         {
             question: "What keyword preserves a variable's value between function calls?",
             options: ["auto", "extern", "static", "const"],
-            answer: 2
+            answer: 2,
+            explanation: "static preserves a variable's value between function calls. The variable is initialized only once and retains its value across calls."
         },
         {
             question: "Global variables are stored in which memory segment?",
             options: ["Stack", "Heap", "Data/BSS", "Register"],
-            answer: 2
+            answer: 2,
+            explanation: "Global variables and static local variables are stored in the data segment (initialized) or BSS segment (zero-initialized). Local variables go on the stack."
         },
         {
             question: "What does 'variable shadowing' mean?",
             options: ["Variable is deleted", "Local variable hides global variable", "Variable is constant", "Variable is optimized"],
-            answer: 1
+            answer: 1,
+            explanation: "Variable shadowing means a local variable with the same name as an outer-scope variable hides (shadows) it within the inner scope."
         },
         {
             question: "Which operator returns the size in bytes?",
             options: ["size()", "sizeof", "length", "bytes"],
-            answer: 1
+            answer: 1,
+            explanation: "sizeof returns the size in bytes of a type or variable at compile time. It's an operator, not a function, so it works on types too."
         },
         {
             question: "What header provides INT_MAX and CHAR_MIN?",
             options: ["<stdint.h>", "<stdlib.h>", "<limits.h>", "<values.h>"],
-            answer: 2
+            answer: 2,
+            explanation: "<limits.h> defines INT_MAX, INT_MIN, CHAR_MAX, CHAR_MIN, and similar constants for all standard integer types."
         },
         {
             question: "What happens when an assert() condition is false?",
             options: ["Returns 0", "Prints a warning and continues", "Program aborts with error message", "Compiler error"],
-            answer: 2
+            answer: 2,
+            explanation: "When assert(condition) evaluates to false (0), it prints a diagnostic message and calls abort(), terminating the program immediately."
         },
         {
             question: "What does _Thread_local do?",
             options: ["Makes a variable const", "Gives each thread its own copy of the variable", "Locks the variable for thread safety", "Moves the variable to the heap"],
-            answer: 1
+            answer: 1,
+            explanation: "_Thread_local gives each thread its own independent copy of the variable. Changes in one thread are invisible to others."
         }
     ],
     
@@ -733,89 +744,183 @@ int main() {
     
     exam: [
         {
-            question: "What is the result of 12 & 10?",
-            options: ["14", "8", "6", "1100"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    int a = 12, b = 10;
+    printf("%d\\n", a & b);
+    printf("%d\\n", a | b);
+    printf("%d\\n", a ^ b);
+    return 0;
+}`,
+            options: ["8 then 14 then 6", "8 then 14 then 4", "4 then 14 then 6", "8 then 12 then 6"],
+            answer: 0,
+            explanation: "12=1100, 10=1010. AND: 1000=8. OR: 1110=14. XOR: 0110=6. Each operator works bit by bit."
         },
         {
-            question: "2D arrays are stored in memory as:",
-            options: ["Scattered blocks", "A single contiguous block", "Linked lists", "Pointers"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int counter(void) {
+    static int count = 0;
+    count++;
+    return count;
+}
+int main(void) {
+    printf("%d\\n", counter());
+    printf("%d\\n", counter());
+    printf("%d\\n", counter());
+    return 0;
+}`,
+            options: ["1 then 1 then 1", "0 then 1 then 2", "1 then 2 then 3", "1 then 0 then 0"],
+            answer: 2,
+            explanation: "A static local variable persists between calls, initialized once to 0. Each call increments it: 1, 2, 3."
         },
         {
-            question: "Recursion typically uses more:",
-            options: ["Disk Space", "Stack Memory", "Heap Memory", "CPU Registers"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    int arr[2][3] = {{1,2,3},{4,5,6}};
+    printf("%d\\n", arr[1][2]);
+    printf("%d\\n", arr[0][1] + arr[1][0]);
+    return 0;
+}`,
+            options: ["6 then 6", "5 then 5", "6 then 7", "5 then 6"],
+            answer: 0,
+            explanation: "arr[1][2] is row 1, column 2 = 6. arr[0][1] = 2, arr[1][0] = 4. Sum = 6."
         },
         {
-            question: "static int x inside a function is initialized:",
-            options: ["Every call", "Only once", "Never", "On demand"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int fib(int n) {
+    if (n <= 1) return n;
+    return fib(n-1) + fib(n-2);
+}
+int main(void) {
+    printf("%d\\n", fib(6));
+    return 0;
+}`,
+            options: ["8", "13", "5", "21"],
+            answer: 0,
+            explanation: "Fibonacci: fib(0)=0, fib(1)=1, fib(2)=1, fib(3)=2, fib(4)=3, fib(5)=5, fib(6)=8."
         },
         {
-            question: "extern keyword is used for:",
-            options: ["Defining a variable", "Declaring an external variable", "Hiding a variable", "Deleting a variable"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    int x = 5;
+    {
+        int x = 10;
+        printf("%d\\n", x);
+    }
+    printf("%d\\n", x);
+    return 0;
+}`,
+            options: ["10 then 10", "5 then 5", "10 then 5", "5 then 10"],
+            answer: 2,
+            explanation: "Variable shadowing: the inner block declares its own x=10 which shadows the outer x=5. Inside the block, x=10 is printed. Outside, the original x=5 is visible again."
         },
         {
-            question: "Scope determines:",
-            options: ["Variable lifetime", "Variable visibility", "Variable size", "Variable type"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    int x = 0xFF;
+    printf("%d\\n", x >> 4);
+    printf("%d\\n", x << 1);
+    return 0;
+}`,
+            options: ["15 then 510", "16 then 510", "15 then 255", "16 then 255"],
+            answer: 0,
+            explanation: "0xFF = 255. Right shift by 4: 255>>4 = 15 (divides by 16). Left shift by 1: 255<<1 = 510 (multiplies by 2)."
         },
         {
-            question: "Bitwise XOR of a number with itself is always:",
-            options: ["1", "0", "The number", "-1"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    int age = 20;
+    const char *label = (age >= 18) ? "adult" : "minor";
+    printf("%s\\n", label);
+    age = 15;
+    label = (age >= 18) ? "adult" : "minor";
+    printf("%s\\n", label);
+    return 0;
+}`,
+            options: ["adult then adult", "minor then minor", "adult then minor", "minor then adult"],
+            answer: 2,
+            explanation: "First ternary: 20 >= 18 is true → 'adult'. Second: 15 >= 18 is false → 'minor'."
         },
         {
-            question: "What is the output of: printf(\"%zu\", sizeof(double));?",
-            options: ["4", "8", "16", "Compiler dependent"],
-            answer: 3
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            if (i == j) printf("%d ", i);
+        }
+    }
+    printf("\\n");
+    return 0;
+}`,
+            options: ["0 1 2", "0 0 1 1 2 2", "1 2 3", "0 1 2 0 1 2"],
+            answer: 0,
+            explanation: "Prints i only when i==j (the diagonal of a matrix). i=0,j=0: print 0. i=1,j=1: print 1. i=2,j=2: print 2."
         },
         {
-            question: "What macro in <limits.h> holds the maximum value of an int?",
-            options: ["MAX_INT", "INT_MAX", "INTEGER_MAX", "MAXINT"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#include <assert.h>
+int main(void) {
+    int x = 5;
+    assert(x > 0);
+    printf("passed\\n");
+    assert(x > 10);
+    printf("never\\n");
+    return 0;
+}`,
+            options: ["passed then never", "passed then abort/crash", "abort/crash immediately", "Both asserts pass"],
+            answer: 1,
+            explanation: "The first assert (x > 0) passes, so 'passed' prints. The second assert (x > 10, which is false) aborts the program — 'never' is never reached."
         },
         {
-            question: "assert() is disabled at compile time by defining:",
-            options: ["NO_ASSERT", "ASSERT_OFF", "NDEBUG", "DISABLE_ASSERT"],
-            answer: 2
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    unsigned int u = 0;
+    u--;
+    printf("%u\\n", u);
+    return 0;
+}`,
+            options: ["-1", "0", "4294967295", "Undefined behavior"],
+            answer: 2,
+            explanation: "Unsigned integers wrap on underflow. 0 - 1 wraps to UINT_MAX = 2^32-1 = 4294967295 on a 32-bit unsigned int. This is well-defined — unlike signed overflow."
         },
         {
-            question: "In C23, 'constexpr int N = 10;' differs from '#define N 10' because:",
-            options: [
-                "constexpr is only valid inside functions",
-                "constexpr has a type, scope, and shows in the debugger",
-                "constexpr values cannot be used in switch case labels",
-                "There is no practical difference"
-            ],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    int x = 5, y = 10;
+    printf("%d\\n", x > 3 && y < 20);
+    printf("%d\\n", x > 7 || y > 5);
+    printf("%d\\n", !(x == 5));
+    return 0;
+}`,
+            options: ["1 then 1 then 0", "0 then 1 then 0", "1 then 0 then 1", "1 then 1 then 1"],
+            answer: 0,
+            explanation: "x>3 && y<20: both true → 1. x>7 || y>5: x>7 false, y>5 true → 1. !(x==5): x==5 is true, NOT true = false → 0."
         },
         {
-            question: "What is the type of 'nullptr' in C23?",
-            options: ["void*", "int", "nullptr_t", "null_t"],
-            answer: 2
-        },
-        {
-            question: "Which C23 literal represents 255 in binary?",
-            options: ["0255", "255b", "0b11111111", "b11111111"],
-            answer: 2
-        },
-        {
-            question: "What does unsigned _BitInt(4) allow as its maximum value?",
-            options: ["4", "8", "15", "16"],
-            answer: 2
-        },
-        {
-            question: "In C23, 'enum Color : uint8_t { RED, GREEN, BLUE };' means:",
-            options: [
-                "The enum values are stored as pointers",
-                "The enum's underlying storage type is uint8_t",
-                "Only values 0-2 are allowed",
-                "The enum cannot be used in switch statements"
-            ],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    constexpr int SIZE = 4;
+    int arr[SIZE];
+    for (int i = 0; i < SIZE; i++) arr[i] = i * i;
+    for (int i = 0; i < SIZE; i++) printf("%d ", arr[i]);
+    printf("\\n");
+    return 0;
+}`,
+            options: ["0 1 4 9", "1 4 9 16", "0 1 2 3", "0 2 4 6"],
+            answer: 0,
+            explanation: "C23 constexpr: SIZE=4 is a typed compile-time constant usable as array size. Loop fills arr with squares: 0, 1, 4, 9."
         }
     ]
 };

@@ -606,52 +606,62 @@ int main() {
         {
             question: "Which symbol is used for single-line comments?",
             options: ["##", "//", "/* */", "<!--"],
-            answer: 1
+            answer: 1,
+            explanation: "'//' starts a single-line comment. Everything from '//' to line end is ignored by the compiler. '/*' opens a multi-line comment. '#' starts preprocessor directives, not comments."
         },
         {
             question: "What does #include <stdio.h> do?",
             options: ["Defines a variable", "Links the standard I/O library", "Starts the program", "Prints text"],
-            answer: 1
+            answer: 1,
+            explanation: "#include tells the preprocessor to copy the contents of that header file into your source. stdio.h contains declarations for printf, scanf, and other I/O functions — without it, the compiler has no idea what printf is."
         },
         {
             question: "Which format specifier is used for an integer?",
             options: ["%f", "%s", "%d", "%c"],
-            answer: 2
+            answer: 2,
+            explanation: "%d is the format specifier for a signed decimal integer. %f is for float/double, %c for char, %s for strings."
         },
         {
             question: "What is the output of 7 / 2 in C (integers)?",
             options: ["3.5", "3", "4", "Error"],
-            answer: 1
+            answer: 1,
+            explanation: "Both operands are integers, so C performs integer division — the fractional part is truncated, not rounded. 7/2 = 3, not 3.5."
         },
         {
             question: "Why do we use & in scanf?",
             options: ["It looks nice", "To pass the address of the variable", "To declare a pointer", "It is optional"],
-            answer: 1
+            answer: 1,
+            explanation: "scanf needs the address of the variable to write into, not its value. & gives the address. Without &, you'd pass the current (garbage) value of the variable as the destination address — undefined behavior."
         },
         {
             question: "What does 'return 0' mean in main?",
             options: ["Program crashed", "Program ended successfully", "Program returned a value to be printed", "Infinite loop"],
-            answer: 1
+            answer: 1,
+            explanation: "return 0 from main signals successful program termination to the OS. Non-zero conventionally means an error occurred. This is how shell scripts check if a program succeeded."
         },
         {
             question: "Which operator checks for equality?",
             options: ["=", "==", "!=", "==="],
-            answer: 1
+            answer: 1,
+            explanation: "== is the equality comparison operator. = is assignment. This is one of the most common beginner bugs: writing if (x = 5) assigns 5 to x instead of comparing."
         },
         {
             question: "What is the value of 15 % 4?",
             options: ["3", "3.75", "0", "4"],
-            answer: 0
+            answer: 0,
+            explanation: "% is the modulo (remainder) operator. 15 / 4 = 3 remainder 3, so 15 % 4 = 3."
         },
         {
             question: "What header file provides the bool, true, and false keywords?",
             options: ["<stdlib.h>", "<stdbool.h>", "<types.h>", "<bool.h>"],
-            answer: 1
+            answer: 1,
+            explanation: "stdbool.h provides the bool type, and the true/false macros in C99-C17. In C23, bool/true/false are built-in keywords and no header is needed."
         },
         {
             question: "What is the decimal value of 0x1F in C?",
             options: ["10", "16", "31", "1F"],
-            answer: 2
+            answer: 2,
+            explanation: "0x means hexadecimal. 0x1F = 1*16 + 15 = 31 in decimal."
         }
     ],
     
@@ -754,74 +764,169 @@ int main() {
     
     exam: [
         {
-            question: "Which is NOT a valid C data type?",
-            options: ["int", "float", "string", "char"],
-            answer: 2
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    printf("Hello\\n");
+    printf("World\\n");
+    return 0;
+}`,
+            options: ["HelloWorld", "Hello World", "Hello\\nWorld", "Hello on one line, World on the next"],
+            answer: 3,
+            explanation: "Each printf ends with \\n which moves to a new line. 'Hello' is printed then a newline, then 'World' then a newline. Two separate lines."
         },
         {
-            question: "What happens if you forget a semicolon?",
-            options: ["Program runs anyway", "Compiler error", "Warning only", "Computer crashes"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    int x = 10;
+    int y = 3;
+    printf("%d\\n", x / y);
+    return 0;
+}`,
+            options: ["3.33", "3.333333", "3", "4"],
+            answer: 2,
+            explanation: "Integer division truncates toward zero: 10 / 3 = 3, remainder discarded. To get a decimal result, cast one operand to float first."
         },
         {
-            question: "Which value is false in C?",
-            options: ["1", "5", "0", "-1"],
-            answer: 2
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    printf("%d\\n", 5 + 3 * 2);
+    printf("%d\\n", (5 + 3) * 2);
+    return 0;
+}`,
+            options: ["16 then 16", "11 then 16", "16 then 11", "11 then 11"],
+            answer: 1,
+            explanation: "Operator precedence: * before +. 5 + 3*2 = 5 + 6 = 11. With parentheses: (5+3)*2 = 8*2 = 16."
         },
         {
-            question: "What is the size of char (usually)?",
-            options: ["1 bit", "1 byte", "4 bytes", "8 bytes"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    int x = 5;
+    int y = x++;
+    printf("%d %d\\n", x, y);
+    return 0;
+}`,
+            options: ["6 6", "5 5", "6 5", "5 6"],
+            answer: 2,
+            explanation: "Post-increment: y captures x's value (5) THEN x increments to 6. So x=6, y=5. Pre-increment (++x) would make both 6."
         },
         {
-            question: "What does \\n represent?",
-            options: ["New paragraph", "Newline", "Next number", "Null"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    int x = 7;
+    if (x > 5)
+        printf("big\\n");
+    if (x > 10)
+        printf("huge\\n");
+    printf("done\\n");
+    return 0;
+}`,
+            options: ["big then done", "big then huge then done", "done only", "huge then done"],
+            answer: 0,
+            explanation: "7 > 5 is true so 'big' prints. 7 > 10 is false so 'huge' is skipped. 'done' always runs regardless."
         },
         {
-            question: "Which header file is needed for printf?",
-            options: ["<conio.h>", "<stdlib.h>", "<stdio.h>", "<string.h>"],
-            answer: 2
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    char c = 'A';
+    printf("%c\\n", c);
+    printf("%d\\n", c);
+    return 0;
+}`,
+            options: ["A then 65", "A then A", "65 then 65", "A then 97"],
+            answer: 0,
+            explanation: "'A' has ASCII value 65. %c prints the character symbol, %d prints its integer value. Output: A then 65."
         },
         {
-            question: "What is the result of: int x = 5; x *= 2;",
-            options: ["5", "7", "10", "25"],
-            answer: 2
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    int x = 0;
+    printf("%d\\n", x == 0);
+    printf("%d\\n", x == 1);
+    printf("%d\\n", x != 0);
+    return 0;
+}`,
+            options: ["1 then 0 then 0", "0 then 1 then 1", "1 then 1 then 0", "0 then 0 then 1"],
+            answer: 0,
+            explanation: "Comparisons return 1 (true) or 0 (false). x==0 is true (1), x==1 is false (0), x!=0 is false (0)."
         },
         {
-            question: "How do you start a multi-line comment?",
-            options: ["//", "/*", "#", "<!--"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    int x = 15;
+    switch (x % 3) {
+        case 0: printf("zero\\n"); break;
+        case 1: printf("one\\n");  break;
+        case 2: printf("two\\n");  break;
+    }
+    return 0;
+}`,
+            options: ["one", "two", "zero", "zero then one then two"],
+            answer: 2,
+            explanation: "15 % 3 = 0 (15 is exactly divisible by 3). Case 0 matches, prints 'zero', break exits. Other cases don't run."
         },
         {
-            question: "Which operator has highest precedence?",
-            options: ["+", "*", "++", "=="],
-            answer: 2
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    int a = 10, b = 20;
+    int bigger = (a > b) ? a : b;
+    printf("%d\\n", bigger);
+    return 0;
+}`,
+            options: ["10", "20", "0", "1"],
+            answer: 1,
+            explanation: "Ternary: a > b (10 > 20) is false, so the expression evaluates to b (20). bigger = 20."
         },
         {
-            question: "What is a variable?",
-            options: ["A fixed value", "A container for data", "A function name", "A keyword"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    printf("%d\\n", 010);
+    printf("%d\\n", 0x10);
+    return 0;
+}`,
+            options: ["10 then 10", "8 then 16", "10 then 16", "8 then 10"],
+            answer: 1,
+            explanation: "Leading 0 makes a literal octal (base 8): 010 = 8. 0x prefix is hexadecimal (base 16): 0x10 = 16. Leading zero is a classic C gotcha."
         },
         {
-            question: "What prefix makes a number hexadecimal in C?",
-            options: ["0b", "0x", "0h", "0o"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    int x = 5;
+    if (x = 0)
+        printf("true\\n");
+    else
+        printf("false\\n");
+    return 0;
+}`,
+            options: ["true", "false", "Compiler error", "Undefined behavior"],
+            answer: 1,
+            explanation: "x = 0 is ASSIGNMENT, not comparison (which would be ==). It assigns 0 to x, and 0 is false, so the else branch runs. A notorious bug — most compilers warn about this."
         },
         {
-            question: "What is the decimal value of 010 in C?",
-            options: ["10", "2", "8", "16"],
-            answer: 2
-        },
-        {
-            question: "What does the 'f' suffix do in '3.14f'?",
-            options: ["Makes it a function call", "Makes it a float instead of double", "Makes it final/const", "Has no effect"],
-            answer: 1
-        },
-        {
-            question: "What does _Bool store when assigned 42?",
-            options: ["42", "1", "0", "Undefined"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    int a = 5;
+    a++;
+    printf("%d\\n", a);
+    a--;
+    a--;
+    printf("%d\\n", a);
+    return 0;
+}`,
+            options: ["5 then 4", "6 then 4", "6 then 5", "5 then 3"],
+            answer: 1,
+            explanation: "a++ increments 5 to 6. Then a-- brings it to 5, and a-- again to 4. Prints 6 then 4."
         }
     ]
 };

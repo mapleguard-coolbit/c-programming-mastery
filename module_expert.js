@@ -188,58 +188,42 @@ int main(void) {
                     output: "Fields:\n  'Alice'\n  '30'\n  'Engineer'\n  'New York'\n\nWords (splitting on space/tab/newline):\n  'one'\n  'two'\n  'three'\n  'four'"
                 },
                 {
-                    title: "Span Functions and Safe String Building: strspn, strcspn, snprintf",
-                    content: "Three less-known but highly practical string functions. <code>strspn</code> and <code>strcspn</code> measure how many characters at the start of a string belong (or don't belong) to a set — essential for hand-writing lexers and parsers. <code>snprintf</code> is the safe way to build strings into a buffer, always null-terminating and never overflowing.",
+                    title: "Duplicating Strings: strdup (now standard in C23)",
+                    content: "<code>strdup</code> allocates heap memory, copies the string into it, and returns the pointer. It's been a POSIX extension for decades and is now part of standard C23. Since it allocates heap memory, you're responsible for calling <code>free</code> on the result.",
                     points: [
-                        "<code>strspn(str, accept)</code>: Returns the length of the initial segment of <code>str</code> that consists entirely of characters in <code>accept</code>. Think of it as 'how many characters match this set'.",
-                        "<code>strcspn(str, reject)</code>: Returns the length of the initial segment of <code>str</code> consisting of characters NOT in <code>reject</code>. 'How many characters before hitting one of these?'",
-                        "<code>snprintf(buf, size, fmt, ...)</code>: Like <code>sprintf</code> but writes at most <code>size-1</code> characters and always null-terminates. The return value is how many characters would have been written if the buffer were large enough — use this to detect truncation."
+                        "<code>strdup(s)</code>: Duplicate a full string. Returns a heap-allocated copy.",
+                        "<code>strndup(s, n)</code>: Duplicate at most <code>n</code> characters of <code>s</code>. A null terminator is always added. Useful for safely copying a substring.",
+                        "<strong>Why use it?</strong>: When a function receives a string pointer, it only has a temporary view — the caller may free or modify it. Calling <code>strdup</code> gives the function its own permanent copy it fully owns."
                     ],
                     code: `#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
+// Function that takes ownership: needs its own copy
+char *makeTitle(const char *str) {
+    char *copy = strdup(str); // Heap-allocate a copy (C23 standard)
+    if (!copy) return NULL;
+    
+    if (copy[0] >= 'a' && copy[0] <= 'z') copy[0] -= 32;
+    return copy; // Caller is responsible for free()
+}
+
 int main(void) {
-    // strspn: count leading digits
-    const char *str = "12345abc";
-    size_t digits = strspn(str, "0123456789");
-    printf("Leading digits in '%s': %zu\\n", str, digits);  // 5
-
-    // strcspn: find first whitespace or comma
-    const char *token = "hello, world";
-    size_t word_len = strcspn(token, " ,");
-    printf("First word length: %zu ('%.*s')\\n", word_len, (int)word_len, token);
-
-    // Practical: manual tokenizer using strcspn + strspn
-    const char *p = "  one   two  three  ";
-    const char *ws = " \\t";
-    printf("\\nTokens:\\n");
-    while (*p) {
-        p += strspn(p, ws);           // skip whitespace
-        size_t n = strcspn(p, ws);    // find end of token
-        if (n) printf("  '%.*s'\\n", (int)n, p);
-        p += n;
-    }
-
-    // snprintf: safe string building, detects truncation
-    char buf[16];
-    int written = snprintf(buf, sizeof(buf), "Hello, %s!", "World");
-    printf("\\nResult: '%s'\\n", buf);
-    printf("Would need: %d bytes, got: %zu\\n", written, sizeof(buf));
-    if (written >= (int)sizeof(buf)) printf("WARNING: output was truncated!\\n");
-
+    const char *original = "hello, world";
+    
+    char *titled = makeTitle(original);
+    printf("Original: %s\\n", original); // Unchanged
+    printf("Titled:   %s\\n", titled);
+    free(titled);
+    
+    // strndup: copy only first 5 chars
+    char *partial = strndup("hello world", 5);
+    printf("Partial:  %s\\n", partial); // "hello"
+    free(partial);
+    
     return 0;
 }`,
-                    output: `Leading digits in '12345abc': 5
-First word length: 5 ('hello')
-
-Tokens:
-  'one'
-  'two'
-  'three'
-
-Result: 'Hello, World!'
-Would need: 13 bytes, got: 16`,
-                    tip: "The <code>snprintf</code> truncation check (<code>if (written >= (int)sizeof(buf))</code>) is the canonical safe pattern. Many buffer overflow vulnerabilities in C code come from ignoring this return value. Always check it when the output size is not guaranteed to fit."
+                    output: "Original: hello, world\nTitled:   Hello, world\nPartial:  hello"
                 }
             ]
         },
@@ -668,15 +652,12 @@ int main(void) {
                     warning: "If <code>unreachable()</code> is actually reached, behavior is undefined — the compiler may have already eliminated surrounding checks. For debug builds, guard it: <code>#ifdef NDEBUG unreachable() #else abort() #endif</code>."
                 },
                 {
-                    title: "[[noreturn]]: Annotating Functions That Never Return",
-                    content: "When a function always ends execution — by calling <code>exit()</code>, <code>abort()</code>, or <code>longjmp()</code>ing away — annotate it with <code>[[noreturn]]</code>. This is not just documentation: the compiler uses it to eliminate dead code after such calls, suppress missing-return warnings, and improve analysis. The termination functions themselves (<code>exit</code>, <code>abort</code>, <code>_Exit</code>) are covered in the Advanced module — <code>[[noreturn]]</code> is what lets you write <em>wrappers</em> around them with the same semantics.",
+                    title: "[[noreturn]] and Termination Functions",
+                    content: "Functions that always terminate the program should be marked <code>[[noreturn]]</code> (C23) so callers don't need a return after them and the compiler can optimize accordingly. The standard provides four termination functions with different cleanup semantics.",
                     code: `#include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
 
-// [[noreturn]]: compiler knows this function never returns.
-// No return statement needed after calls to it.
-// Compiler will warn if this function CAN return.
 [[noreturn]]
 void fatal(const char *fmt, ...) {
     va_list args;
@@ -685,28 +666,25 @@ void fatal(const char *fmt, ...) {
     vfprintf(stderr, fmt, args);
     fprintf(stderr, "\\n");
     va_end(args);
-    abort();
+    abort();  // No cleanup — state is corrupt
 }
 
-// Compiler knows control never reaches past fatal() calls,
-// so it does not warn about missing return paths:
-const char *classify(int code) {
-    if (code == 0)   return "zero";
-    if (code > 0)    return "positive";
-    if (code < 0)    return "negative";
-    fatal("impossible: code=%d", code);
-    // No return needed — compiler trusts [[noreturn]]
-}
+void cleanup_handler(void) { printf("cleanup() called\\n"); }
 
 int main(void) {
-    printf("%s\\n", classify(5));
-    printf("%s\\n", classify(-3));
-    printf("%s\\n", classify(0));
-    // fatal("something went wrong: %d", 42);  // would abort
+    atexit(cleanup_handler);
+
+    int x = -1;
+    if (x < 0) {
+        // exit(): flushes buffers, runs atexit() handlers
+        // abort(): does NOT run atexit(), dumps core
+        // _Exit(): no cleanup at all (useful after fork())
+        fprintf(stderr, "bad input\\n");
+        exit(EXIT_FAILURE);   // cleanup_handler WILL run
+    }
     return 0;
 }`,
-                    output: "positive\nnegative\nzero",
-                    tip: "The compiler will emit a warning if a <code>[[noreturn]]</code> function has a code path that could actually return — that mismatch is a bug and the warning is catching it. Pair <code>[[noreturn]]</code> with <code>unreachable()</code> for the exhaustive coverage of 'this function always ends' vs 'this point in the code is never reached'."
+                    output: "bad input\ncleanup() called"
                 }
             ]
         },
@@ -871,9 +849,40 @@ int main(void) {
 
     practice: [
         {
+            title: "Safe Number Parser",
+            difficulty: "easy",
+            problem: "Write a function <code>parseInteger(const char *str, int *result)</code> that converts a string to an integer using <code>strtol</code>. Return 1 on success, 0 on failure (non-numeric input or empty string). Test it with '42', 'abc', '123xyz', and ''.",
+            hint: "Check both that endptr moved from the start AND that it now points to the null terminator.",
+            solution: `#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+
+int parseInteger(const char *str, int *result) {
+    if (!str || *str == '\\0') return 0;
+    char *endptr;
+    errno = 0;
+    long val = strtol(str, &endptr, 10);
+    if (endptr == str || *endptr != '\\0') return 0;
+    *result = (int)val;
+    return 1;
+}
+
+int main(void) {
+    int val;
+    const char *tests[] = {"42", "abc", "123xyz", "", "-99", "0"};
+    for (int i = 0; i < 6; i++) {
+        if (parseInteger(tests[i], &val))
+            printf("'%s' -> %d\\n", tests[i], val);
+        else
+            printf("'%s' -> INVALID\\n", tests[i]);
+    }
+    return 0;
+}`
+        },
+        {
             title: "Custom Logger with vprintf",
             difficulty: "easy",
-            problem: "Write a variadic <code>log_msg(level, fmt, ...)</code> function with three levels: INFO, WARN, ERROR. Each message should be prefixed with <code>[INFO]</code>, <code>[WARN]</code>, or <code>[ERROR]</code>. Use <code>vprintf</code> to forward the format arguments.",
+            problem: "Write a variadic <code>log(level, fmt, ...)</code> function with three levels: INFO, WARN, ERROR. Each message should be prefixed with <code>[INFO]</code>, <code>[WARN]</code>, or <code>[ERROR]</code>. Use <code>vprintf</code> to forward the format arguments.",
             hint: "Use <code>va_start</code>/<code>va_end</code> around a call to <code>vprintf(fmt, ap)</code>.",
             solution: `#include <stdio.h>
 #include <stdarg.h>
@@ -896,7 +905,7 @@ int main(void) {
     log_msg(LOG_ERROR, "File not found: %s", "data.csv");
     return 0;
 }`,
-            explanation: "<code>vprintf</code> accepts a <code>va_list</code> instead of <code>...</code>, letting you forward variadic arguments without processing them yourself. This is the standard pattern for any wrapper around printf-family functions."
+            explanation: "<code>vprintf</code> is the key: it accepts a <code>va_list</code> instead of <code>...</code>, so you can forward your variadic arguments to it without processing them yourself. This is the standard pattern for any wrapper around printf-family functions."
         },
         {
             title: "Type-Safe Print Macro with _Generic",
@@ -922,6 +931,36 @@ int main(void) {
     return 0;
 }`,
             explanation: "<code>_Generic</code> selects the format string literal at compile time. X is evaluated only once — type selection and value printing are two separate steps in the macro expansion."
+        },
+        {
+            title: "Generic Array Sorter with qsort",
+            difficulty: "medium",
+            problem: "Use <code>qsort</code> to sort an array of <code>struct Student</code> (name and GPA) by GPA in descending order. Print the sorted list with rankings.",
+            hint: "The comparator receives <code>const void*</code> pointers. Cast to <code>struct Student*</code> and compare GPA fields. Reverse the sign for descending order.",
+            solution: `#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct { char name[20]; float gpa; } Student;
+
+int byGPADesc(const void *a, const void *b) {
+    const Student *sa = (const Student*)a;
+    const Student *sb = (const Student*)b;
+    if (sa->gpa > sb->gpa) return -1;
+    if (sa->gpa < sb->gpa) return  1;
+    return 0;
+}
+
+int main(void) {
+    Student students[] = {
+        {"Alice", 3.5}, {"Bob", 3.8}, {"Charlie", 3.2},
+        {"Diana", 3.9}, {"Eve",  3.6}
+    };
+    int n = 5;
+    qsort(students, n, sizeof(Student), byGPADesc);
+    for (int i = 0; i < n; i++)
+        printf("%d. %-10s %.1f\\n", i+1, students[i].name, students[i].gpa);
+    return 0;
+}`
         },
         {
             title: "Error Handling with setjmp/longjmp",
@@ -966,75 +1005,40 @@ int main(void) {
             explanation: "Each iteration re-calls <code>setjmp</code> to establish a fresh recovery point. When <code>longjmp</code> fires, execution resumes at that <code>setjmp</code> with the error code. The idiom <code>if (code == 0) { normal } else { recovery }</code> is the canonical pattern."
         },
         {
-            title: "Thread-Safe Counter with Mutex",
+            title: "Cache-Friendly Matrix Sum",
             difficulty: "hard",
-            problem: "Create a program that launches 5 threads, each incrementing a shared counter 10,000 times. First run it without a mutex and observe the wrong result. Then add a <code>mtx_t</code> mutex and verify the counter always reaches exactly 50,000.",
-            hint: "Use <code>thrd_create</code>/<code>thrd_join</code> for threads and <code>mtx_lock</code>/<code>mtx_unlock</code> to protect the increment.",
+            problem: "Create a 512×512 int matrix filled with sequential values. Write two sum functions: row-major and column-major iteration. Use <code>clock()</code> to time both. The row-major version should be noticeably faster due to cache locality.",
             solution: `#include <stdio.h>
-#include <threads.h>
+#include <time.h>
 
-#define N_THREADS 5
-#define N_INC     10000
+#define N 512
+int matrix[N][N];
 
-int counter = 0;
-mtx_t lock;
+long long rowSum(void) {
+    long long s = 0;
+    for (int i = 0; i < N; i++)
+        for (int j = 0; j < N; j++) s += matrix[i][j];
+    return s;
+}
 
-int worker(void *arg) {
-    (void)arg;
-    for (int i = 0; i < N_INC; i++) {
-        mtx_lock(&lock);
-        counter++;
-        mtx_unlock(&lock);
-    }
-    return thrd_success;
+long long colSum(void) {
+    long long s = 0;
+    for (int j = 0; j < N; j++)
+        for (int i = 0; i < N; i++) s += matrix[i][j];
+    return s;
 }
 
 int main(void) {
-    mtx_init(&lock, mtx_plain);
-    thrd_t t[N_THREADS];
-    for (int i = 0; i < N_THREADS; i++) thrd_create(&t[i], worker, NULL);
-    for (int i = 0; i < N_THREADS; i++) thrd_join(t[i], NULL);
-    printf("Expected: %d\\n", N_THREADS * N_INC);
-    printf("Got:      %d\\n", counter);
-    mtx_destroy(&lock);
-    return 0;
-}`,
-            explanation: "Without the mutex, multiple threads read-increment-write the same memory location concurrently, each discarding the other's increment. The mutex serializes access so each increment is atomic from the program's perspective."
-        },
-        {
-            title: "Typeof Generic SWAP and CLAMP",
-            difficulty: "medium",
-            problem: "Using C23 <code>typeof</code>, write two macros: <code>SWAP(a, b)</code> that swaps any two variables of the same type (evaluating each argument exactly once), and <code>CLAMP(val, lo, hi)</code> that clamps a value to a range. Test both with <code>int</code> and <code>double</code>.",
-            hint: "Use <code>do { typeof(A) _tmp = (A); ... } while(0)</code> for SWAP. Use a GCC/Clang statement expression <code>({ ... })</code> for CLAMP to return a value.",
-            solution: `#include <stdio.h>
+    int v = 0;
+    for (int i = 0; i < N; i++)
+        for (int j = 0; j < N; j++) matrix[i][j] = v++;
 
-#define SWAP(A, B)              \\
-    do {                        \\
-        typeof(A) _t = (A);     \\
-        (A) = (B); (B) = _t;   \\
-    } while (0)
+    clock_t s, e;
+    s = clock(); long long r = rowSum(); e = clock();
+    printf("Row-major:    sum=%lld  %ldms\\n", r, (e-s)*1000/CLOCKS_PER_SEC);
 
-#define CLAMP(val, lo, hi)               \\
-    ({                                   \\
-        typeof(val) _v = (val);          \\
-        typeof(val) _l = (lo);           \\
-        typeof(val) _h = (hi);           \\
-        _v < _l ? _l : (_v > _h ? _h : _v); \\
-    })
-
-int main(void) {
-    int a = 3, b = 7;
-    SWAP(a, b);
-    printf("SWAP int: a=%d b=%d\\n", a, b);
-
-    double x = 1.5, y = 9.9;
-    SWAP(x, y);
-    printf("SWAP double: x=%.1f y=%.1f\\n", x, y);
-
-    printf("CLAMP(15, 0, 10)       = %d\\n",   CLAMP(15, 0, 10));
-    printf("CLAMP(5, 0, 10)        = %d\\n",   CLAMP(5,  0, 10));
-    printf("CLAMP(-3, 0, 10)       = %d\\n",   CLAMP(-3, 0, 10));
-    printf("CLAMP(11.5, 0.0, 10.0) = %.1f\\n", CLAMP(11.5, 0.0, 10.0));
+    s = clock(); long long c = colSum(); e = clock();
+    printf("Col-major:    sum=%lld  %ldms\\n", c, (e-s)*1000/CLOCKS_PER_SEC);
     return 0;
 }`
         }
@@ -1044,130 +1048,251 @@ int main(void) {
         {
             question: "In a variadic function, what does va_arg(ap, type) do?",
             options: ["Returns the count of remaining arguments", "Retrieves the next argument, interpreted as 'type'", "Advances to the next fixed parameter", "Checks whether an argument of 'type' exists"],
-            answer: 1
+            answer: 1,
+            explanation: "va_arg(ap, type) retrieves the next argument from the va_list, interpreting the bytes as the specified type. The type must exactly match what was passed — getting it wrong is undefined behavior."
         },
         {
             question: "Why must you call va_end(ap) before returning from a variadic function?",
             options: ["To free the va_list heap allocation", "To restore any stack state the va_list machinery may have modified", "To reset the argument count to zero", "To flush buffered output"],
-            answer: 1
+            answer: 1,
+            explanation: "va_end cleans up any resources or state the va_list machinery allocated. On some architectures va_start allocates resources; va_end releases them. Always pair them."
         },
         {
             question: "What does _Generic select on?",
             options: ["The runtime value of the controlling expression", "The compile-time type of the controlling expression", "The size of the controlling expression", "The pointer address of the controlling expression"],
-            answer: 1
+            answer: 1,
+            explanation: "_Generic selects an expression based on the compile-time type of the controlling expression — not its value. It's resolved entirely at compile time."
         },
         {
             question: "In C23, what does 'auto x = 3.14;' deduce as the type of x?",
             options: ["float", "long double", "double", "auto (a special type)"],
-            answer: 2
+            answer: 2,
+            explanation: "3.14 without a suffix is a double literal in C. auto deduces the type from the initializer, so x gets type double."
         },
         {
             question: "After longjmp() is called, where does execution resume?",
             options: ["At the most recently called setjmp()", "At the beginning of main()", "At the setjmp() call whose jmp_buf was passed to longjmp()", "At a randomly selected setjmp() on the call stack"],
-            answer: 2
+            answer: 2,
+            explanation: "longjmp resumes execution at the setjmp call whose jmp_buf was passed as the first argument. It does not 'return' — it teleports execution."
         },
         {
             question: "What does unreachable() promise to the compiler?",
             options: ["That the function has no return value", "That the next statement is always executed", "That execution will never reach that point in the code", "That the surrounding loop will terminate"],
-            answer: 2
+            answer: 2,
+            explanation: "unreachable() tells the compiler this code path will never execute. The compiler may optimize away surrounding checks based on this promise."
         },
         {
             question: "In C11's <threads.h>, which function waits for a thread to finish?",
             options: ["thrd_sleep()", "thrd_wait()", "thrd_join()", "thrd_sync()"],
-            answer: 2
+            answer: 2,
+            explanation: "thrd_join blocks the calling thread until the specified thread finishes. It's the C11 equivalent of POSIX pthread_join."
         },
         {
             question: "What does the 'restrict' qualifier promise to the compiler?",
             options: ["The pointer is read-only", "The pointer will never be NULL", "No other non-derived pointer accesses the same object during the pointer's lifetime", "The pointer points to heap memory"],
-            answer: 2
+            answer: 2,
+            explanation: "restrict promises that no other pointer (not derived from this one) will access the same memory during its lifetime. This enables vectorization and load/store reordering."
         },
         {
-            question: "What is the key difference between typeof(x) and typeof_unqual(x) when x is 'const int'?",
-            options: ["They are identical", "typeof gives 'const int'; typeof_unqual gives 'int'", "typeof_unqual evaluates x at runtime", "typeof removes pointer qualifiers"],
-            answer: 1
+            question: "What is a race condition?",
+            options: ["A performance problem in loops", "A bug caused by two threads accessing shared data without synchronization", "A memory leak in threads", "A type mismatch error"],
+            answer: 1,
+            explanation: "A race condition occurs when two threads access shared data concurrently without synchronization, and at least one access is a write. The outcome depends on scheduling timing."
         },
         {
-            question: "What does [[noreturn]] tell the compiler?",
-            options: ["The function returns void", "The function never returns to its caller", "The function is always inlined", "The function has no side effects"],
-            answer: 1
+            question: "Which function should you use instead of atoi for reliable error detection?",
+            options: ["itoa", "strtol", "scanf", "sscanf"],
+            answer: 1,
+            explanation: "strtol detects errors: it sets errno on overflow and updates endptr to point after the last consumed character. atoi gives no error indication — it silently returns 0 on failure."
         }
     ],
 
     exam: [
         {
-            question: "What happens if you call va_arg with the wrong type?",
-            options: ["A compile-time error", "A runtime exception is thrown", "Undefined behavior — the bytes are misinterpreted", "The function returns 0"],
-            answer: 2
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#include <stdarg.h>
+int sum(int count, ...) {
+    va_list ap;
+    va_start(ap, count);
+    int total = 0;
+    for (int i = 0; i < count; i++)
+        total += va_arg(ap, int);
+    va_end(ap);
+    return total;
+}
+int main(void) {
+    printf("%d\\n", sum(3, 10, 20, 30));
+    printf("%d\\n", sum(2, 5, 5));
+    return 0;
+}`,
+            options: ["60 then 10", "30 then 5", "60 then 5", "30 then 10"],
+            answer: 0,
+            explanation: "sum(3, 10,20,30) adds 10+20+30=60. sum(2, 5,5) adds 5+5=10. The count argument tells the function how many variadic args to consume."
         },
         {
-            question: "In a variadic function using the sentinel pattern, what signals 'no more arguments'?",
-            options: ["The count reaches zero", "A special sentinel value agreed upon by the caller and callee (e.g. NULL)", "va_arg automatically returns NULL", "The va_list is exhausted and returns 0"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#define TYPE(X) _Generic((X),  \\
+    int:    "int",             \\
+    double: "double",          \\
+    float:  "float",           \\
+    default:"other"            \\
+)
+int main(void) {
+    printf("%s\\n", TYPE(42));
+    printf("%s\\n", TYPE(3.14));
+    printf("%s\\n", TYPE(3.14f));
+    return 0;
+}`,
+            options: ["int then double then float", "int then float then double", "other then double then float", "int then double then other"],
+            answer: 0,
+            explanation: "_Generic dispatches at compile-time based on type. 42 is int, 3.14 is double, 3.14f is float. Each selects the matching branch."
         },
         {
-            question: "Which statement about setjmp() is FALSE?",
-            options: [
-                "setjmp() returns 0 when called directly",
-                "setjmp() can be placed inside any arithmetic expression",
-                "longjmp() must target a function still on the call stack",
-                "Variables modified after setjmp() may revert unless declared volatile"
-            ],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#include <setjmp.h>
+jmp_buf buf;
+void risky(int x) {
+    if (x < 0) longjmp(buf, 99);
+    printf("ok: %d\\n", x);
+}
+int main(void) {
+    int r = setjmp(buf);
+    if (r == 0) {
+        risky(5);
+        risky(-1);
+        risky(3);
+    } else {
+        printf("caught: %d\\n", r);
+    }
+    return 0;
+}`,
+            options: ["ok: 5 then ok: 3 then caught: 99", "ok: 5 then caught: 99", "caught: 99", "ok: 5 then ok: -1 then caught: 99"],
+            answer: 1,
+            explanation: "risky(5) succeeds and prints 'ok: 5'. risky(-1) calls longjmp which jumps back to setjmp with value 99. The else branch runs and risky(3) is never reached."
         },
         {
-            question: "What does thrd_create() return on success?",
-            options: ["0", "thrd_success", "1", "The thread ID as a positive integer"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#include <string.h>
+int main(void) {
+    char *s = "Hello, World!";
+    char *p = strchr(s, ',');
+    if (p) printf("%s\\n", p + 1);
+    char *q = strrchr(s, 'l');
+    if (q) printf("%c\\n", *q);
+    return 0;
+}`,
+            options: [" World! then l", "World! then l", " World! then L", ", World! then l"],
+            answer: 0,
+            explanation: "strchr finds the first ',', so p+1 skips it: ' World!'. strrchr finds the LAST 'l' which is in 'World' at position 10. *q = 'l'."
         },
         {
-            question: "A variable declared with 'thread_local'...",
-            options: [
-                "Is shared between all threads in the same process",
-                "Can only be written from the thread that created it",
-                "Has an independent copy in each thread",
-                "Is automatically mutex-protected"
-            ],
-            answer: 2
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#include <time.h>
+int main(void) {
+    time_t t = 0;
+    struct tm *s = gmtime(&t);
+    printf("%d\\n", s->tm_year + 1900);
+    printf("%d\\n", s->tm_mon + 1);
+    return 0;
+}`,
+            options: ["1970 then 1", "0 then 0", "1900 then 1", "1970 then 0"],
+            answer: 0,
+            explanation: "time_t = 0 is the Unix epoch: January 1, 1970. tm_year is years since 1900 (70 + 1900 = 1970). tm_mon is 0-indexed (0 + 1 = 1)."
         },
         {
-            question: "What does [[noreturn]] enable the compiler to do that it cannot without it?",
-            options: [
-                "Inline the function at every call site",
-                "Eliminate unreachable code after calls to that function and suppress missing-return warnings in callers",
-                "Allocate the function's stack frame statically",
-                "Automatically generate an atexit() handler"
-            ],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+typedef enum { RED=0, GREEN=1, BLUE=2 } Color;
+const char* name(Color c) {
+    switch (c) {
+        case RED:   return "red";
+        case GREEN: return "green";
+        case BLUE:  return "blue";
+    }
+    __builtin_unreachable();
+}
+int main(void) {
+    for (int i = 0; i < 3; i++)
+        printf("%s\\n", name((Color)i));
+    return 0;
+}`,
+            options: ["red then green then blue", "0 then 1 then 2", "RED then GREEN then BLUE", "Undefined behavior"],
+            answer: 0,
+            explanation: "The loop casts 0, 1, 2 to Color. Each matches a case and returns the string. unreachable() tells the compiler no other values arrive — no missing-return warning."
         },
         {
-            question: "strspn(\"123abc\", \"0123456789\") returns:",
-            options: ["6", "3", "0", "The pointer to 'a'"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+static inline int clamp(int v, int lo, int hi) {
+    if (v < lo) return lo;
+    if (v > hi) return hi;
+    return v;
+}
+int main(void) {
+    printf("%d\\n", clamp(-5, 0, 10));
+    printf("%d\\n", clamp(7,  0, 10));
+    printf("%d\\n", clamp(15, 0, 10));
+    return 0;
+}`,
+            options: ["0 then 7 then 10", "-5 then 7 then 15", "0 then 0 then 10", "0 then 7 then 15"],
+            answer: 0,
+            explanation: "clamp(-5, 0, 10): -5 < 0 → 0. clamp(7, 0, 10): in range → 7. clamp(15, 0, 10): 15 > 10 → 10."
         },
         {
-            question: "If snprintf(buf, 5, \"%s\", \"Hello, World!\") is called, what is the return value and buf content?",
-            options: [
-                "Returns 4, buf = \"Hell\"",
-                "Returns 13 (full length), buf = \"Hell\" with null terminator",
-                "Returns 5, buf = \"Hello\"",
-                "Undefined behavior — buffer overflow"
-            ],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#include <stdarg.h>
+void log_msg(const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    printf("[LOG] ");
+    vprintf(fmt, ap);
+    va_end(ap);
+}
+int main(void) {
+    log_msg("x=%d y=%d\\n", 3, 7);
+    return 0;
+}`,
+            options: ["[LOG] x=3 y=7", "x=3 y=7", "[LOG] fmt", "Compile error"],
+            answer: 0,
+            explanation: "vprintf forwards the va_list to printf. The [LOG] prefix is printed first, then vprintf expands the format string with the arguments."
         },
         {
-            question: "Violating a restrict promise (passing aliased pointers) results in...",
-            options: ["A compile-time error", "A runtime exception", "Undefined behavior — potentially silently wrong results", "The aliasing is detected and handled automatically"],
-            answer: 2
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    double arr[] = {1.0, 2.0, 3.0, 4.0};
+    double *restrict p = arr;
+    double *restrict q = arr + 2;
+    for (int i = 0; i < 2; i++) {
+        p[i] += q[i];
+    }
+    printf("%.0f %.0f\\n", arr[0], arr[1]);
+    return 0;
+}`,
+            options: ["4 6", "1 2", "3 4", "2 4"],
+            answer: 0,
+            explanation: "p[0] += q[0]: arr[0] += arr[2] → 1+3=4. p[1] += q[1]: arr[1] += arr[3] → 2+4=6. The restrict here is technically valid since p and q don't overlap."
         },
         {
-            question: "Which correctly uses _Generic to select a format string?",
-            options: [
-                "#define FMT(x) _Generic(x, int: \"%d\", double: \"%f\")",
-                "#define FMT(x) _Generic((x), int: \"%d\", double: \"%f\")",
-                "#define FMT(x) _Generic<x>(int: \"%d\", double: \"%f\")",
-                "#define FMT(x) generic((x), int, \"%d\", double, \"%f\")"
-            ],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#include <string.h>
+int main(void) {
+    char dest[20] = "Hello";
+    char *end = memccpy(dest + 5, ", World!", '!', 10);
+    if (end) *end = '\\0';
+    printf("%s\\n", dest);
+    return 0;
+}`,
+            options: ["Hello, World!", "Hello", "Hello, World", ", World!"],
+            answer: 0,
+            explanation: "memccpy copies from ', World!' into dest+5, stopping after '!' and returning the byte after it. Null-terminating there gives 'Hello, World!'."
         }
     ]
 };

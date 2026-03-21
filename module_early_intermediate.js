@@ -642,57 +642,68 @@ int main() {
         {
             question: "Which loop runs at least once?",
             options: ["for", "while", "do-while", "foreach"],
-            answer: 2
+            answer: 2,
+            explanation: "do-while checks its condition after executing the body, so it always runs at least once. while and for check first."
         },
         {
             question: "What does `break` do?",
             options: ["Pauses the loop", "Skips iteration", "Exits the loop", "Breaks the compiler"],
-            answer: 2
+            answer: 2,
+            explanation: "break immediately exits the innermost loop or switch statement. continue skips to the next iteration; break exits entirely."
         },
         {
             question: "What is the index of the last element in array `arr[10]`?",
             options: ["10", "9", "0", "11"],
-            answer: 1
+            answer: 1,
+            explanation: "Array indices start at 0, so for arr[10] the valid indices are 0 through 9. Index 9 is the last element."
         },
         {
             question: "What ends a C string?",
             options: ["Space", "Period", "Null Terminator (\\0)", "Newline"],
-            answer: 2
+            answer: 2,
+            explanation: "C strings end with a null terminator '\\0' (value 0). Functions like strlen count characters until they find this byte."
         },
         {
             question: "How are arguments passed to functions in C?",
             options: ["By Reference", "By Value (Copy)", "By Pointer", "By Name"],
-            answer: 1
+            answer: 1,
+            explanation: "C passes all function arguments by value — a copy is made. To modify the original, you must pass a pointer."
         },
         {
             question: "Which function copies a string?",
             options: ["strcat", "strcmp", "strcpy", "strlen"],
-            answer: 2
+            answer: 2,
+            explanation: "strcpy copies a string into a destination buffer. strcat appends. strcmp compares. strlen measures."
         },
         {
             question: "What is the output of: for(int i=0; i<3; i++) printf(\"*\");",
             options: ["***", "****", "**", "Error"],
-            answer: 0
+            answer: 0,
+            explanation: "The loop runs for i=0,1,2, printing '0\\n1\\n2\\n'. The condition i<3 means it stops before i=3."
         },
         {
             question: "If you access array index out of bounds, what happens?",
             options: ["Compiler Error", "Runtime Error", "Undefined Behavior", "Returns 0"],
-            answer: 2
+            answer: 2,
+            explanation: "Out-of-bounds array access is undefined behavior — anything can happen. The program may crash, silently corrupt data, or appear to work. C does not perform bounds checking."
         },
         {
             question: "What does isdigit('5') return?",
             options: ["0", "5", "Non-zero (true)", "'5'"],
-            answer: 2
+            answer: 2,
+            explanation: "isdigit returns non-zero (true) for characters '0' through '9', and 0 for anything else. It tests the ASCII value of the character."
         },
         {
             question: "What function must you call before rand() to get different results each run?",
             options: ["seed()", "srand(time(NULL))", "init_rand()", "randomize()"],
-            answer: 1
+            answer: 1,
+            explanation: "srand seeds the random number generator. Without seeding with time(NULL), rand() produces the same sequence every run because it starts with the same default seed."
         },
         {
             question: "Which type holds the largest integer values?",
             options: ["int", "long", "long long", "short"],
-            answer: 2
+            answer: 2,
+            explanation: "long long is 64 bits and holds values up to ~9.2 × 10^18. unsigned long long is even larger. int is only 32 bits."
         }
     ],
     
@@ -807,69 +818,184 @@ int main() {
     
     exam: [
         {
-            question: "In a for loop, where do you initialize the variable?",
-            options: ["Body", "First section", "Second section", "Third section"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    for (int i = 0; i < 4; i++) {
+        printf("%d ", i);
+    }
+    printf("\\n");
+    return 0;
+}`,
+            options: ["0 1 2 3 4", "0 1 2 3", "1 2 3 4", "0 1 2"],
+            answer: 1,
+            explanation: "The loop runs while i < 4, so i takes values 0, 1, 2, 3. When i reaches 4, the condition fails and the loop exits. Four numbers printed."
         },
         {
-            question: "What does `continue` do in a loop?",
-            options: ["Exits the function", "Skips to next iteration", "Exits the program", "Restarts loop"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    int i = 0;
+    while (i < 5) {
+        if (i == 3) break;
+        printf("%d ", i);
+        i++;
+    }
+    printf("\\n");
+    return 0;
+}`,
+            options: ["0 1 2 3 4", "0 1 2 3", "0 1 2", "1 2 3"],
+            answer: 2,
+            explanation: "When i reaches 3, break exits the loop immediately without printing 3. Only 0, 1, 2 are printed."
         },
         {
-            question: "What is a function prototype?",
-            options: ["The function body", "A declaration before main", "The return value", "A variable type"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int square(int n) {
+    return n * n;
+}
+int main(void) {
+    printf("%d\\n", square(4));
+    printf("%d\\n", square(3) + square(4));
+    return 0;
+}`,
+            options: ["16 then 25", "16 then 7", "4 then 7", "16 then 24"],
+            answer: 0,
+            explanation: "square(4) = 16. square(3) + square(4) = 9 + 16 = 25. Functions are evaluated before their results are used in expressions."
         },
         {
-            question: "Size of array `int arr[5]` in bytes (assuming int is 4 bytes):",
-            options: ["5", "20", "10", "4"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    int arr[] = {10, 20, 30, 40, 50};
+    printf("%d\\n", arr[2]);
+    printf("%d\\n", arr[0] + arr[4]);
+    return 0;
+}`,
+            options: ["30 then 60", "20 then 50", "30 then 50", "20 then 60"],
+            answer: 0,
+            explanation: "arr[2] is the third element: 30. arr[0] + arr[4] = 10 + 50 = 60."
         },
         {
-            question: "Which function appends strings?",
-            options: ["strcpy", "strcmp", "strcat", "strlen"],
-            answer: 2
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#include <string.h>
+int main(void) {
+    char s[] = "Hello";
+    printf("%zu\\n", strlen(s));
+    printf("%zu\\n", sizeof(s));
+    return 0;
+}`,
+            options: ["5 then 5", "5 then 6", "6 then 6", "5 then 4"],
+            answer: 1,
+            explanation: "strlen counts characters excluding the null terminator: 5. sizeof includes the null terminator: 6. This is a key distinction."
         },
         {
-            question: "If a function returns nothing, what is its type?",
-            options: ["int", "null", "void", "none"],
-            answer: 2
+            question: "What is the output?",
+            code: `#include <stdio.h>
+void addOne(int x) {
+    x = x + 1;
+}
+int main(void) {
+    int n = 5;
+    addOne(n);
+    printf("%d\\n", n);
+    return 0;
+}`,
+            options: ["6", "5", "0", "Undefined"],
+            answer: 1,
+            explanation: "C passes arguments by value — addOne receives a copy of n. Modifying x inside the function does not affect n in main. n stays 5."
         },
         {
-            question: "Which loop is best for iterating over an array?",
-            options: ["for", "while", "do-while", "No difference"],
-            answer: 0
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    for (int i = 0; i < 5; i++) {
+        if (i % 2 == 0) continue;
+        printf("%d ", i);
+    }
+    printf("\\n");
+    return 0;
+}`,
+            options: ["0 2 4", "1 3", "0 1 2 3 4", "1 2 3 4"],
+            answer: 1,
+            explanation: "continue skips the rest of the loop body when i is even. Only odd values (1, 3) reach printf."
         },
         {
-            question: "What is the output of strcmp(\"a\", \"b\")?",
-            options: ["0", "Negative number", "Positive number", "1"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    int sum = 0;
+    for (int i = 1; i <= 5; i++) {
+        sum += i;
+    }
+    printf("%d\\n", sum);
+    return 0;
+}`,
+            options: ["10", "15", "14", "5"],
+            answer: 1,
+            explanation: "Adds 1+2+3+4+5 = 15. The loop runs for i = 1, 2, 3, 4, 5 (inclusive because i <= 5)."
         },
         {
-            question: "Can you change the size of an array at runtime?",
-            options: ["Yes", "No", "Only with realloc", "Only global arrays"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#include <string.h>
+int main(void) {
+    char a[] = "cat";
+    char b[] = "dog";
+    printf("%d\\n", strcmp(a, b));
+    printf("%d\\n", strcmp(a, a));
+    return 0;
+}`,
+            options: ["0 then 0", "negative then 0", "positive then 0", "negative then 1"],
+            answer: 1,
+            explanation: "strcmp compares lexicographically. 'c' < 'd' so strcmp(\"cat\", \"dog\") is negative. Comparing equal strings returns 0."
         },
         {
-            question: "A string literal 'Hi' takes how many bytes?",
-            options: ["2", "3", "4", "1"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    int x = 10;
+    do {
+        printf("%d ", x);
+        x -= 3;
+    } while (x > 0);
+    printf("\\n");
+    return 0;
+}`,
+            options: ["10 7 4 1", "10 7 4", "7 4 1", "10 7 4 1 -2"],
+            answer: 0,
+            explanation: "do-while executes before checking the condition. Starts at 10: prints 10 (x=7), 7 (x=4), 4 (x=1), 1 (x=-2). Now x > 0 is false, loop ends."
         },
         {
-            question: "What header provides isalpha(), isdigit(), toupper()?",
-            options: ["<string.h>", "<stdlib.h>", "<ctype.h>", "<char.h>"],
-            answer: 2
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    int arr[3] = {0};
+    arr[1] = 42;
+    for (int i = 0; i < 3; i++) {
+        printf("%d ", arr[i]);
+    }
+    return 0;
+}`,
+            options: ["0 0 0", "42 0 0", "0 42 0", "42 42 42"],
+            answer: 2,
+            explanation: "int arr[3] = {0} initializes all elements to zero. Then arr[1] is set to 42. Loop prints each: 0, 42, 0."
         },
         {
-            question: "What does unsigned int allow that signed int does not?",
-            options: ["Larger values overall", "Negative values", "Only values >= 0, with double the positive range", "Floating-point values"],
-            answer: 2
-        },
-        {
-            question: "What format specifier prints a long long?",
-            options: ["%d", "%ld", "%lld", "%l"],
-            answer: 2
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int factorial(int n) {
+    if (n <= 1) return 1;
+    return n * factorial(n - 1);
+}
+int main(void) {
+    printf("%d\\n", factorial(5));
+    return 0;
+}`,
+            options: ["120", "24", "60", "5"],
+            answer: 0,
+            explanation: "5! = 5*4*3*2*1 = 120. The recursion unwinds: factorial(5) = 5*factorial(4) = 5*24 = 120."
         }
     ]
 };

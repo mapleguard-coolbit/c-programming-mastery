@@ -498,52 +498,62 @@ sequence at offset:  4`,
         {
             question: "What does the & operator return?",
             options: ["The value of the variable", "The address of the variable", "The size of the variable", "The pointer itself"],
-            answer: 1
+            answer: 1,
+            explanation: "The & (address-of) operator returns the memory address of a variable — a pointer to where that variable lives in RAM."
         },
         {
             question: "What is dereferencing?",
             options: ["Creating a pointer", "Accessing the value at the address", "Deleting a pointer", "Assigning an address"],
-            answer: 1
+            answer: 1,
+            explanation: "Dereferencing a pointer (using *ptr) accesses or modifies the value at the address the pointer holds. It 'follows' the pointer to what it points to."
         },
         {
             question: "If ptr points to an int (4 bytes), what is ptr + 1?",
             options: ["ptr address + 1 byte", "ptr address + 4 bytes", "ptr value + 1", "Compiler error"],
-            answer: 1
+            answer: 1,
+            explanation: "Pointer arithmetic advances by the size of the pointed-to type. int is 4 bytes, so ptr+1 advances 4 bytes — to the next int."
         },
         {
             question: "Where does malloc allocate memory from?",
             options: ["Stack", "Heap", "Code Segment", "Register"],
-            answer: 1
+            answer: 1,
+            explanation: "malloc allocates from the heap (free store). Stack memory is for local variables and is automatically freed when functions return."
         },
         {
             question: "What happens if you forget to free memory?",
             options: ["Compiler Error", "Segmentation Fault", "Memory Leak", "Nothing"],
-            answer: 2
+            answer: 2,
+            explanation: "Forgetting to free dynamically allocated memory causes a memory leak — the memory stays allocated for the lifetime of the program, wasting RAM."
         },
         {
             question: "What is the difference between malloc and calloc?",
             options: ["malloc is faster", "calloc initializes memory to zero", "malloc zeros memory", "calloc is for chars only"],
-            answer: 1
+            answer: 1,
+            explanation: "malloc allocates uninitialized memory (contents are garbage). calloc allocates and zero-initializes all bytes. Use calloc when you need clean memory."
         },
         {
             question: "What does free(ptr) do?",
             options: ["Deletes the pointer variable", "Returns memory to the heap", "Changes the value to 0", "Stops the program"],
-            answer: 1
+            answer: 1,
+            explanation: "free(ptr) returns the allocated block to the allocator's pool. The pointer itself still holds the old address (a dangling pointer) — you should set it to NULL after freeing."
         },
         {
             question: "What happens if you dereference a NULL pointer?",
             options: ["Returns 0", "Nothing", "Segmentation Fault (Crash)", "Memory Leak"],
-            answer: 2
+            answer: 2,
+            explanation: "Dereferencing NULL is undefined behavior — on most systems it causes a segmentation fault (SIGSEGV), crashing the program immediately."
         },
         {
             question: "What does pointer subtraction (ptr2 - ptr1) return?",
             options: ["Byte difference", "Number of elements between them", "ptrdiff_t in bytes", "Always negative"],
-            answer: 1
+            answer: 1,
+            explanation: "Pointer subtraction gives the number of elements between two pointers (as ptrdiff_t), not bytes. Both pointers must point into the same array."
         },
         {
             question: "What does perror() do?",
             options: ["Prints a custom error and exits", "Prints the system error message for the current errno", "Clears errno", "Returns the errno value"],
-            answer: 1
+            answer: 1,
+            explanation: "perror prints a human-readable description of the last error set in errno, prefixed by your string. Essential for diagnosing failed system calls."
         }
     ],
     
@@ -649,79 +659,192 @@ int main() {
     
     exam: [
         {
-            question: "What is a pointer?",
-            options: ["A variable that stores a value", "A variable that stores an address", "A function", "A memory block"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    int x = 42;
+    int *p = &x;
+    printf("%d\\n", *p);
+    *p = 100;
+    printf("%d\\n", x);
+    return 0;
+}`,
+            options: ["42 then 42", "42 then 100", "100 then 100", "100 then 42"],
+            answer: 1,
+            explanation: "*p dereferences to read x's value: 42. *p = 100 writes through the pointer, changing x itself. So x is now 100."
         },
         {
-            question: "What does *ptr = 10; do?",
-            options: ["Changes the address of ptr", "Changes the value at the address ptr holds", "Creates a pointer", "Nothing"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+void double_it(int *n) {
+    *n = *n * 2;
+}
+int main(void) {
+    int x = 7;
+    double_it(&x);
+    printf("%d\\n", x);
+    return 0;
+}`,
+            options: ["7", "14", "49", "Undefined"],
+            answer: 1,
+            explanation: "&x passes the address of x. Inside double_it, *n = *n * 2 modifies x through the pointer. x becomes 14."
         },
         {
-            question: "int arr[5]; arr is equivalent to:",
-            options: ["&arr[0]", "arr[0]", "*arr", "&arr"],
-            answer: 0
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    int arr[] = {5, 10, 15, 20};
+    int *p = arr;
+    printf("%d\\n", *p);
+    p++;
+    printf("%d\\n", *p);
+    p += 2;
+    printf("%d\\n", *p);
+    return 0;
+}`,
+            options: ["5 then 10 then 20", "5 then 10 then 15", "5 then 15 then 20", "5 then 6 then 8"],
+            answer: 0,
+            explanation: "p starts at arr[0]=5. p++ moves to arr[1]=10. p+=2 moves to arr[3]=20. Pointer arithmetic advances by element size."
         },
         {
-            question: "Which header is needed for malloc?",
-            options: ["<stdio.h>", "<string.h>", "<stdlib.h>", "<memory.h>"],
-            answer: 2
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#include <stdlib.h>
+int main(void) {
+    int *arr = malloc(3 * sizeof(int));
+    arr[0] = 1; arr[1] = 2; arr[2] = 3;
+    printf("%d %d %d\\n", arr[0], arr[1], arr[2]);
+    free(arr);
+    return 0;
+}`,
+            options: ["1 2 3", "0 0 0", "Undefined", "Crash"],
+            answer: 0,
+            explanation: "malloc allocates space for 3 ints on the heap. Assigning and printing through array indexing works identically to stack arrays. free releases the memory."
         },
         {
-            question: "What does calloc return?",
-            options: ["Integer", "Void Pointer", "NULL on failure", "Both B and C"],
-            answer: 3
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    int arr[] = {1, 2, 3, 4, 5};
+    int *p = arr;
+    int *q = arr + 5;
+    printf("%td\\n", q - p);
+    return 0;
+}`,
+            options: ["5", "20", "4", "1"],
+            answer: 0,
+            explanation: "Pointer subtraction gives the number of elements between the pointers (not bytes). arr+5 is one past the end, so q-p = 5 elements."
         },
         {
-            question: "realloc is used to:",
-            options: ["Allocate new memory", "Deallocate memory", "Resize existing memory", "Move memory"],
-            answer: 2
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#include <stdlib.h>
+int main(void) {
+    int *p = calloc(4, sizeof(int));
+    printf("%d %d\\n", p[0], p[2]);
+    p[1] = 99;
+    printf("%d\\n", p[1]);
+    free(p);
+    return 0;
+}`,
+            options: ["0 0 then 99", "Undefined then 99", "1 1 then 99", "0 0 then 0"],
+            answer: 0,
+            explanation: "calloc zero-initializes memory: all 4 ints start as 0. After p[1]=99, that element is 99. First printf: 0 0. Second: 99."
         },
         {
-            question: "A dangling pointer points to:",
-            options: ["NULL", "Valid memory", "Freed memory", "Code segment"],
-            answer: 2
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int add(int a, int b)  { return a + b; }
+int mul(int a, int b)  { return a * b; }
+int main(void) {
+    int (*op)(int, int) = add;
+    printf("%d\\n", op(3, 4));
+    op = mul;
+    printf("%d\\n", op(3, 4));
+    return 0;
+}`,
+            options: ["7 then 12", "12 then 7", "7 then 7", "12 then 12"],
+            answer: 0,
+            explanation: "Function pointer op first points to add: op(3,4) = 7. Then reassigned to mul: op(3,4) = 12."
         },
         {
-            question: "Function pointers are used for:",
-            options: ["Faster execution", "Callbacks and dynamic dispatch", "Memory allocation", "Loop optimization"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main(void) {
+    const int x = 10;
+    const int *p = &x;
+    printf("%d\\n", *p);
+    // *p = 20;  // would be a compile error
+    int y = 20;
+    p = &y;
+    printf("%d\\n", *p);
+    return 0;
+}`,
+            options: ["10 then 20", "10 then 10", "20 then 20", "Compile error"],
+            answer: 0,
+            explanation: "const int *p means the pointed-to value is read-only through p, but p itself can be reassigned. *p prints x=10, then p is pointed to y=20."
         },
         {
-            question: "What type is the result of subtracting two pointers?",
-            options: ["int", "size_t", "ptrdiff_t", "long"],
-            answer: 2
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#include <stddef.h>
+struct Point { char flag; double x; };
+int main(void) {
+    printf("%zu\\n", sizeof(struct Point));
+    printf("%zu\\n", offsetof(struct Point, x));
+    return 0;
+}`,
+            options: ["9 then 1", "16 then 8", "10 then 1", "16 then 1"],
+            answer: 1,
+            explanation: "char (1 byte) is followed by 7 bytes of padding to align double (8-byte aligned). Total size: 16. x starts at offset 8."
         },
         {
-            question: "What does realloc(NULL, size) do?",
-            options: ["Returns NULL", "Behaves like malloc(size)", "Crashes", "Frees memory"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#include <stdlib.h>
+int main(void) {
+    int *p = malloc(sizeof(int));
+    *p = 42;
+    int *q = p;
+    free(p);
+    // q is now a dangling pointer
+    printf("freed\\n");
+    return 0;
+}`,
+            options: ["42", "freed", "Crash immediately", "Undefined behavior on free"],
+            answer: 1,
+            explanation: "free(p) releases the memory. printf runs after that and prints 'freed'. q is a dangling pointer but we don't dereference it here, so no crash — just a bug waiting to happen."
         },
         {
-            question: "What does alignof(double) return on a typical 64-bit system?",
-            options: ["4", "8", "16", "64"],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#include <stdlib.h>
+int main(void) {
+    int *arr = malloc(3 * sizeof(int));
+    arr[0]=10; arr[1]=20; arr[2]=30;
+    arr = realloc(arr, 5 * sizeof(int));
+    arr[3]=40; arr[4]=50;
+    for (int i=0; i<5; i++) printf("%d ", arr[i]);
+    free(arr);
+    return 0;
+}`,
+            options: ["10 20 30 40 50", "10 20 30 0 0", "0 0 0 40 50", "Undefined"],
+            answer: 0,
+            explanation: "realloc extends the allocation to 5 ints. The first 3 elements are preserved. New elements are set to 40 and 50 explicitly."
         },
         {
-            question: "_Static_assert(condition, message) fires:",
-            options: [
-                "At runtime when condition is false",
-                "At compile time when condition is false, halting the build",
-                "At link time",
-                "Only in debug builds"
-            ],
-            answer: 1
-        },
-        {
-            question: "alignas(16) on a variable means:",
-            options: [
-                "The variable takes 16 bytes",
-                "The variable's address is a multiple of 16",
-                "The variable is on the 16th stack frame",
-                "The variable is aligned to 16 bits"
-            ],
-            answer: 1
+            question: "What is the output?",
+            code: `#include <stdio.h>
+#include <stddef.h>
+int main(void) {
+    alignas(16) double d = 3.14;
+    printf("%zu\\n", alignof(double));
+    printf("%d\\n", (int)((uintptr_t)&d % 16 == 0));
+    return 0;
+}`,
+            options: ["8 then 0", "8 then 1", "16 then 1", "16 then 0"],
+            answer: 1,
+            explanation: "alignof(double) is 8 (natural alignment). alignas(16) forces the address to be a multiple of 16, so &d % 16 == 0 is true (1)."
         }
     ]
 };
