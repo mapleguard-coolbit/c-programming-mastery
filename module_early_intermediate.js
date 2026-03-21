@@ -204,7 +204,8 @@ int main() {
     return 0;
 }`,
                     output: "Inside function: 100\nInside main: 5",
-                    tip: "This is not a limitation to work around — it's actually useful. Functions being isolated from their callers prevents a lot of accidental bugs. But sometimes you genuinely need a function to modify the original variable. To do that, you pass the variable's memory address instead of its value, which is the entire point of pointers. We cover that in the Low-Level module, and it will make this moment click into place."
+                    tip: "This is not a limitation to work around — it's actually useful. Functions being isolated from their callers prevents a lot of accidental bugs. But sometimes you genuinely need a function to modify the original variable. To do that, you pass the variable's memory address instead of its value, which is the entire point of pointers. We cover that in the Low-Level module, and it will make this moment click into place.",
+                    tip: "If you need a function to modify the original variable, the answer is pointers — pass the variable's address instead of its value. That's covered in the Low-Level Core module under 'Pointers and Functions'."
                 },
                 {
                     title: "Function Prototypes",

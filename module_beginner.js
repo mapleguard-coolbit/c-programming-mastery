@@ -701,7 +701,7 @@ int main() {
         },
         {
             title: "Even or Odd",
-            difficulty: "medium",
+            difficulty: "easy",
             problem: "Ask the user for a number. Tell them if it is Even or Odd. Use a bool variable to store the result. (Hint: use the modulus operator %).",
             hint: "Include <stdbool.h> and declare: bool isEven = (n % 2 == 0);",
             solution: `#include <stdio.h>
@@ -766,169 +766,167 @@ int main() {
         {
             question: "What is the output?",
             code: `#include <stdio.h>
-int main(void) {
-    printf("Hello\\n");
-    printf("World\\n");
+int main() {
+    printf("A");
+    printf("B\\n");
+    printf("C");
     return 0;
 }`,
-            options: ["HelloWorld", "Hello World", "Hello\\nWorld", "Hello on one line, World on the next"],
-            answer: 3,
-            explanation: "Each printf ends with \\n which moves to a new line. 'Hello' is printed then a newline, then 'World' then a newline. Two separate lines."
+            options: ["A\\nBC", "AB\\nC", "ABC\\n", "A B C"],
+            answer: 1,
+            explanation: "printf does not add a newline automatically. Only \\n in the second call creates a newline, so output is AB on one line, then C on the next with no trailing newline."
         },
         {
             question: "What is the output?",
             code: `#include <stdio.h>
-int main(void) {
+int main() {
     int x = 10;
     int y = 3;
-    printf("%d\\n", x / y);
+    printf("%d %d\\n", x / y, x % y);
     return 0;
 }`,
-            options: ["3.33", "3.333333", "3", "4"],
-            answer: 2,
-            explanation: "Integer division truncates toward zero: 10 / 3 = 3, remainder discarded. To get a decimal result, cast one operand to float first."
+            options: ["3 1", "3.33 1", "3 3", "4 1"],
+            answer: 0,
+            explanation: "Integer division 10/3 truncates to 3. The remainder 10%3 is 1."
         },
         {
             question: "What is the output?",
             code: `#include <stdio.h>
-int main(void) {
-    printf("%d\\n", 5 + 3 * 2);
-    printf("%d\\n", (5 + 3) * 2);
+int main() {
+    int a = 5;
+    int b = a++;
+    printf("%d %d\\n", a, b);
     return 0;
 }`,
-            options: ["16 then 16", "11 then 16", "16 then 11", "11 then 11"],
+            options: ["5 5", "6 5", "6 6", "5 6"],
             answer: 1,
-            explanation: "Operator precedence: * before +. 5 + 3*2 = 5 + 6 = 11. With parentheses: (5+3)*2 = 8*2 = 16."
+            explanation: "Post-increment: b captures a's value (5) before a increments. After the line, a=6 and b=5."
         },
         {
             question: "What is the output?",
             code: `#include <stdio.h>
-int main(void) {
-    int x = 5;
-    int y = x++;
-    printf("%d %d\\n", x, y);
-    return 0;
-}`,
-            options: ["6 6", "5 5", "6 5", "5 6"],
-            answer: 2,
-            explanation: "Post-increment: y captures x's value (5) THEN x increments to 6. So x=6, y=5. Pre-increment (++x) would make both 6."
-        },
-        {
-            question: "What is the output?",
-            code: `#include <stdio.h>
-int main(void) {
+int main() {
     int x = 7;
     if (x > 5)
-        printf("big\\n");
-    if (x > 10)
-        printf("huge\\n");
-    printf("done\\n");
+        printf("A\\n");
+        printf("B\\n");
     return 0;
 }`,
-            options: ["big then done", "big then huge then done", "done only", "huge then done"],
-            answer: 0,
-            explanation: "7 > 5 is true so 'big' prints. 7 > 10 is false so 'huge' is skipped. 'done' always runs regardless."
+            options: ["A", "B", "A\\nB", "Nothing"],
+            answer: 2,
+            explanation: "Without braces, only the first printf belongs to the if. The second printf(B) is outside the if and always runs. Both print."
         },
         {
             question: "What is the output?",
             code: `#include <stdio.h>
-int main(void) {
-    char c = 'A';
-    printf("%c\\n", c);
-    printf("%d\\n", c);
-    return 0;
-}`,
-            options: ["A then 65", "A then A", "65 then 65", "A then 97"],
-            answer: 0,
-            explanation: "'A' has ASCII value 65. %c prints the character symbol, %d prints its integer value. Output: A then 65."
-        },
-        {
-            question: "What is the output?",
-            code: `#include <stdio.h>
-int main(void) {
-    int x = 0;
-    printf("%d\\n", x == 0);
-    printf("%d\\n", x == 1);
-    printf("%d\\n", x != 0);
-    return 0;
-}`,
-            options: ["1 then 0 then 0", "0 then 1 then 1", "1 then 1 then 0", "0 then 0 then 1"],
-            answer: 0,
-            explanation: "Comparisons return 1 (true) or 0 (false). x==0 is true (1), x==1 is false (0), x!=0 is false (0)."
-        },
-        {
-            question: "What is the output?",
-            code: `#include <stdio.h>
-int main(void) {
-    int x = 15;
-    switch (x % 3) {
-        case 0: printf("zero\\n"); break;
-        case 1: printf("one\\n");  break;
-        case 2: printf("two\\n");  break;
+int main() {
+    int x = 1;
+    switch (x) {
+        case 1: printf("one ");
+        case 2: printf("two ");
+        default: printf("def");
     }
     return 0;
 }`,
-            options: ["one", "two", "zero", "zero then one then two"],
+            options: ["one", "one two", "one two def", "def"],
             answer: 2,
-            explanation: "15 % 3 = 0 (15 is exactly divisible by 3). Case 0 matches, prints 'zero', break exits. Other cases don't run."
+            explanation: "No break statements — switch falls through every case once it matches. Starting at case 1, execution falls through case 2 and default."
         },
         {
             question: "What is the output?",
             code: `#include <stdio.h>
-int main(void) {
-    int a = 10, b = 20;
-    int bigger = (a > b) ? a : b;
-    printf("%d\\n", bigger);
+int main() {
+    float f = 1 / 2;
+    printf("%.1f\\n", f);
     return 0;
 }`,
-            options: ["10", "20", "0", "1"],
+            options: ["0.5", "0.0", "1.0", "Compile error"],
             answer: 1,
-            explanation: "Ternary: a > b (10 > 20) is false, so the expression evaluates to b (20). bigger = 20."
+            explanation: "1 and 2 are both integer literals, so 1/2 is integer division = 0. That 0 is then stored in f as 0.0. The cast must happen before division: (float)1/2 or 1.0/2."
         },
         {
             question: "What is the output?",
             code: `#include <stdio.h>
-int main(void) {
-    printf("%d\\n", 010);
-    printf("%d\\n", 0x10);
+int main() {
+    int i = 0;
+    while (i < 3) {
+        printf("%d ", i);
+        i++;
+    }
+    printf("%d\\n", i);
     return 0;
 }`,
-            options: ["10 then 10", "8 then 16", "10 then 16", "8 then 10"],
+            options: ["0 1 2 2", "0 1 2 3", "1 2 3 3", "0 1 2"],
             answer: 1,
-            explanation: "Leading 0 makes a literal octal (base 8): 010 = 8. 0x prefix is hexadecimal (base 16): 0x10 = 16. Leading zero is a classic C gotcha."
+            explanation: "Loop runs for i=0,1,2, printing each. After the loop exits (when i=3), printf prints 3."
         },
         {
             question: "What is the output?",
             code: `#include <stdio.h>
-int main(void) {
+int main() {
+    char c = 'A';
+    printf("%c %d\\n", c, c);
+    return 0;
+}`,
+            options: ["A A", "A 65", "65 A", "65 65"],
+            answer: 1,
+            explanation: "%c prints the character 'A'. %d prints its ASCII integer value, which is 65. A char is just a small integer — both formats are valid."
+        },
+        {
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main() {
     int x = 5;
-    if (x = 0)
-        printf("true\\n");
-    else
-        printf("false\\n");
+    int y = 10;
+    int z = x > 3 && y < 5;
+    printf("%d\\n", z);
     return 0;
 }`,
-            options: ["true", "false", "Compiler error", "Undefined behavior"],
+            options: ["1", "0", "5", "10"],
             answer: 1,
-            explanation: "x = 0 is ASSIGNMENT, not comparison (which would be ==). It assigns 0 to x, and 0 is false, so the else branch runs. A notorious bug — most compilers warn about this."
+            explanation: "x > 3 is true (1). y < 5 is false (0). true && false = 0. z is assigned 0."
         },
         {
             question: "What is the output?",
             code: `#include <stdio.h>
-int main(void) {
-    int a = 5;
-    a++;
-    printf("%d\\n", a);
-    a--;
-    a--;
-    printf("%d\\n", a);
+int main() {
+    int x = 0xFF;
+    printf("%d\\n", x);
     return 0;
 }`,
-            options: ["5 then 4", "6 then 4", "6 then 5", "5 then 3"],
+            options: ["FF", "255", "256", "0xFF"],
             answer: 1,
-            explanation: "a++ increments 5 to 6. Then a-- brings it to 5, and a-- again to 4. Prints 6 then 4."
+            explanation: "0xFF is a hexadecimal literal. F=15, so 0xFF = 15*16 + 15 = 255. %d prints it as a decimal integer."
+        },
+        {
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main() {
+    printf("%d\\n", 2 + 3 * 4);
+    printf("%d\\n", (2 + 3) * 4);
+    return 0;
+}`,
+            options: ["14 then 14", "20 then 20", "14 then 20", "20 then 14"],
+            answer: 2,
+            explanation: "Operator precedence: * before +. 2 + 3*4 = 2+12 = 14. With parentheses: (2+3)*4 = 5*4 = 20."
+        },
+        {
+            question: "What is the output?",
+            code: `#include <stdio.h>
+int main() {
+    int a = 5, b = 10;
+    if (a = b) {
+        printf("equal\\n");
+    } else {
+        printf("not equal\\n");
+    }
+    return 0;
+}`,
+            options: ["equal", "not equal", "Compile error", "Nothing"],
+            answer: 0,
+            explanation: "a = b is ASSIGNMENT, not comparison. It assigns 10 to a, then the if tests whether 10 is truthy — it is (non-zero), so 'equal' prints. This is a classic bug; == was intended."
         }
-    ]
+    ],
 };
 
 window.ModuleBeginner = ModuleBeginner;

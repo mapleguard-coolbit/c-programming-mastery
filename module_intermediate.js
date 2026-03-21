@@ -333,7 +333,8 @@ int main() {
                 },
                 {
                     title: "Extern",
-                    content: "When a project spans multiple <code>.c</code> files, you sometimes need to access a global variable defined in a different file. <code>extern</code> says 'this variable exists and is defined somewhere else — don't allocate new memory for it, just let me use it'. It's a promise to the compiler that the linker will resolve later. Without <code>extern</code>, each file creates its own separate copy of the variable, which is almost never what you want."
+                    content: "When a project spans multiple <code>.c</code> files, you sometimes need to access a global variable defined in a different file. <code>extern</code> says 'this variable exists and is defined somewhere else — don't allocate new memory for it, just let me use it'. It's a promise to the compiler that the linker will resolve later. Without <code>extern</code>, each file creates its own separate copy of the variable, which is almost never what you want.",
+                    tip: "The full workflow for extern, header files, and multi-file compilation is covered in the 'Multi-File Programs and Header Files' lesson in this same module."
                 },
                 {
                     title: "Register",

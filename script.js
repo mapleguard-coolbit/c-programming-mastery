@@ -39,7 +39,7 @@ const ModuleNames = {
     lowlevel: 'Low-Level Core',
     advanced: 'Advanced',
     expert: 'Expert',
-    extra: 'Beyond C'
+    extra: 'Extra Topics & Beyond'
 };
 
 const ModuleColors = {

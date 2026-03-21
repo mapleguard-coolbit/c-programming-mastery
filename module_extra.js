@@ -827,6 +827,87 @@ Built string: 'Hello World'`
             ]
         },
         {
+            id: "capstone",
+            title: "Capstone: A Command-Line Task Manager",
+            explanation: "This is the integration point. Every major concept from this curriculum — structs, dynamic memory, file I/O, function pointers, the preprocessor, error handling — comes together in a single project. The spec is deliberately minimal. Your job is to implement it correctly, handle errors properly, and write a Makefile to build it. There is no hand-holding here.",
+            sections: [
+                {
+                    title: "The Spec",
+                    content: "Build a command-line task manager that persists tasks to a binary file. It must support four operations: add a task, list all tasks, mark a task complete, and delete a task. The program is invoked with a subcommand:",
+                    code: `./tasks add "Buy groceries"
+./tasks list
+./tasks done 2
+./tasks delete 3
+ 
+# Example output of 'list':
+[1] [ ] Buy groceries
+[2] [x] Write capstone
+[3] [ ] Read CSAPP`,
+                },
+                {
+                    title: "Required Architecture",
+                    content: "The project must be split across three files. This is not optional — the point is to practice multi-file C.",
+                    points: [
+                        "<strong>task.h</strong>: The public interface. Define the <code>Task</code> struct, the <code>#define</code> for the max description length and storage file path, and prototypes for all functions. Include guard required.",
+                        "<strong>task.c</strong>: All implementation. Functions for loading tasks from the binary file, saving tasks, adding, listing, marking done, and deleting. No <code>main</code> here.",
+                        "<strong>main.c</strong>: Parses <code>argc</code>/<code>argv</code>, calls the appropriate function from <code>task.c</code>, handles unknown subcommands gracefully, returns non-zero on error.",
+                        "<strong>Makefile</strong>: Compiles both <code>.c</code> files with <code>-Wall -Wextra -g</code>, produces an executable named <code>tasks</code>, has a <code>clean</code> target."
+                    ]
+                },
+                {
+                    title: "The Task Struct and File Format",
+                    content: "The simplest possible persistent storage: a binary file that is literally an array of <code>Task</code> structs written with <code>fwrite</code> and read back with <code>fread</code>. No parsing, no serialization library.",
+                    code: `// task.h
+#ifndef TASK_H
+#define TASK_H
+ 
+#define MAX_DESC     128
+#define MAX_TASKS    100
+#define TASKS_FILE   "tasks.dat"
+ 
+typedef struct {
+    int  id;
+    int  done;           // 0 = pending, 1 = complete
+    char desc[MAX_DESC];
+} Task;
+ 
+// Returns number of tasks loaded, -1 on error
+int  tasks_load(Task *tasks, int max);
+// Returns 0 on success, -1 on error
+int  tasks_save(const Task *tasks, int count);
+ 
+int  task_add(const char *description);
+void task_list(void);
+int  task_done(int id);
+int  task_delete(int id);
+ 
+#endif`,
+                },
+                {
+                    title: "Constraints and Error Handling Requirements",
+                    content: "These are not suggestions. Each one exists because skipping it is exactly the kind of bug that causes real programs to fail silently.",
+                    points: [
+                        "<strong>Check every fopen return value.</strong> The file might not exist on first run (that's fine — treat it as zero tasks), but a NULL return for any other reason must print an error with <code>perror()</code> and return failure.",
+                        "<strong>Check every malloc.</strong> If <code>MAX_TASKS</code> is large enough that stack allocation is risky, you may use dynamic memory. If you do, every allocation must be checked for NULL.",
+                        "<strong>Bounds check before adding.</strong> If the task count is already at <code>MAX_TASKS</code>, refuse to add and print a clear error message.",
+                        "<strong>Validate the ID argument for 'done' and 'delete'.</strong> <code>strtol</code> with full error checking — not <code>atoi</code>. If the argument isn't a valid integer, or the ID doesn't exist, print a clear message and return non-zero.",
+                        "<strong>main must return non-zero on any failure.</strong> Every command that fails should exit with a non-zero status so shell scripts can detect failure."
+                    ]
+                },
+                {
+                    title: "Stretch Goals",
+                    content: "Once the core works correctly, these extensions each teach something specific.",
+                    points: [
+                        "<strong>Add a priority field (1-3) to the struct.</strong> Update add to accept an optional <code>-p N</code> flag. Update list to sort by priority using <code>qsort</code> with a function pointer comparator.",
+                        "<strong>Add a due date field.</strong> Store it as a <code>time_t</code>. When listing, use <code>strftime</code> to display it as a human-readable date. Mark tasks overdue if their due date is before <code>time(NULL)</code>.",
+                        "<strong>Add a search subcommand.</strong> <code>./tasks search \"keyword\"</code> — use <code>strstr</code> to find tasks whose description contains the keyword. Print only matching tasks.",
+                        "<strong>Replace the binary format with CSV.</strong> This forces you to implement a simple string parser. Every line is <code>id,done,description</code>. Now tasks.dat is human-readable and editable in a text editor."
+                    ],
+                    tip: "The most common place to get stuck: the binary file format works perfectly until you change the <code>Task</code> struct (add a field, change a size). The old file becomes unreadable because the struct layout changed. This is why production systems use versioned file formats or text-based formats. The stretch goal of switching to CSV is a direct solution to this real problem."
+                }
+            ]
+        },
+        {
             id: "what-next",
             title: "What Next? Life After This Curriculum",
             explanation: "You've covered the language from first principles through C23. That's the foundation — but C mastery is built through practice on real problems, reading real codebases, and using the tools the C ecosystem actually relies on. This lesson is a map of where to go from here.",
@@ -861,7 +942,7 @@ Built string: 'Hello World'`
                         "<strong>GCC and Clang</strong>: Use both. They have different warnings and different sanitizer diagnostics. A program that compiles cleanly under both with <code>-Wall -Wextra -Wpedantic</code> is a much stronger signal of correctness than one that compiles under just one.",
                         "<strong>AddressSanitizer + UBSanitizer</strong>: <code>-fsanitize=address,undefined</code>. If you take away one habit from this curriculum, let it be: always run your test suite with sanitizers enabled.",
                         "<strong>Valgrind</strong>: For leak checking when ASan's overhead is too high, and for profiling with Callgrind. <code>valgrind --leak-check=full --show-leak-kinds=all ./prog</code>.",
-                        "<strong>gdb</strong>: The GNU debugger. Learn 10 commands: <code>run</code>, <code>break</code>, <code>next</code>, <code>step</code>, <code>print</code>, <code>backtrace</code>, <code>info locals</code>, <code>watch</code>, <code>continue</code>, <code>quit</code>. That's enough to debug 90% of crashes.",
+                        "<strong>gdb</strong>: Covered in depth in the Low-Level Core module. The habits built there — breakpoints, backtrace on every crash, watchpoints for disappearing values — apply to every C project you'll ever write.",
                         "<strong>clang-format</strong>: Automated code formatting. Stop arguing about style; just run the formatter. A consistent style makes code reviews faster and diffs cleaner.",
                         "<strong>clang-tidy</strong>: A linter that catches issues beyond what compiler warnings flag — potential null dereferences, performance anti-patterns, and modernization suggestions."
                     ]
@@ -934,44 +1015,6 @@ Built string: 'Hello World'`
     ],
 
     practice: [
-        {
-            title: "Safe Number Parser",
-            difficulty: "easy",
-            problem: "Write a function `parseInteger(const char *str, int *result)` that converts a string to an integer using `strtol`. Return 1 on success, 0 on failure (non-numeric input or empty string). Test it with '42', 'abc', '123xyz', and ''.",
-            hint: "Check both that endptr moved from the start AND that it now points to the null terminator.",
-            solution: `#include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
-
-int parseInteger(const char *str, int *result) {
-    if (str == NULL || *str == '\\0') return 0;
-    
-    char *endptr;
-    errno = 0;
-    long val = strtol(str, &endptr, 10);
-    
-    // Failed if: no digits consumed, or leftover non-digit chars
-    if (endptr == str || *endptr != '\\0') return 0;
-    
-    *result = (int)val;
-    return 1;
-}
-
-int main() {
-    int val;
-    const char *tests[] = {"42", "abc", "123xyz", "", "-99", "0"};
-    int n = sizeof(tests) / sizeof(tests[0]);
-    
-    for (int i = 0; i < n; i++) {
-        if (parseInteger(tests[i], &val)) {
-            printf("'%s' -> %d\\n", tests[i], val);
-        } else {
-            printf("'%s' -> INVALID\\n", tests[i]);
-        }
-    }
-    return 0;
-}`
-        },
         {
             title: "Generic Array Sorter",
             difficulty: "medium",
@@ -1054,58 +1097,6 @@ int main(int argc, char *argv[]) {
     return 0;
 }`
         },
-        {
-            title: "Cache-Friendly Matrix Sum",
-            difficulty: "hard",
-            problem: "Create a 512x512 int matrix filled with sequential values. Write two sum functions: one iterating row-major, one column-major. Use `clock()` to time both and print the results and timings. The row-major version should be noticeably faster.",
-            solution: `#include <stdio.h>
-#include <time.h>
-
-#define N 512
-
-int matrix[N][N];
-
-long long rowMajorSum() {
-    long long sum = 0;
-    for (int i = 0; i < N; i++)
-        for (int j = 0; j < N; j++)
-            sum += matrix[i][j];
-    return sum;
-}
-
-long long colMajorSum() {
-    long long sum = 0;
-    for (int j = 0; j < N; j++)
-        for (int i = 0; i < N; i++)
-            sum += matrix[i][j];
-    return sum;
-}
-
-int main() {
-    // Fill matrix
-    int val = 0;
-    for (int i = 0; i < N; i++)
-        for (int j = 0; j < N; j++)
-            matrix[i][j] = val++;
-    
-    clock_t start, end;
-    long long sum;
-    
-    start = clock();
-    sum = rowMajorSum();
-    end = clock();
-    printf("Row-major:    sum=%lld, time=%ldms\\n",
-           sum, (end - start) * 1000 / CLOCKS_PER_SEC);
-    
-    start = clock();
-    sum = colMajorSum();
-    end = clock();
-    printf("Column-major: sum=%lld, time=%ldms\\n",
-           sum, (end - start) * 1000 / CLOCKS_PER_SEC);
-    
-    return 0;
-}`
-        }
     ],
 
     exam: [

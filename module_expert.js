@@ -881,7 +881,7 @@ int main(void) {
         },
         {
             title: "Custom Logger with vprintf",
-            difficulty: "easy",
+            difficulty: "medium",
             problem: "Write a variadic <code>log(level, fmt, ...)</code> function with three levels: INFO, WARN, ERROR. Each message should be prefixed with <code>[INFO]</code>, <code>[WARN]</code>, or <code>[ERROR]</code>. Use <code>vprintf</code> to forward the format arguments.",
             hint: "Use <code>va_start</code>/<code>va_end</code> around a call to <code>vprintf(fmt, ap)</code>.",
             solution: `#include <stdio.h>

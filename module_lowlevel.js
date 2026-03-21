@@ -62,7 +62,8 @@ int main() {
                 {
                     title: "The NULL Pointer",
                     content: "NULL is a special constant (usually 0) that explicitly means 'this pointer points to nothing'. If you have a pointer but don't have an address to assign it yet, initialize it to NULL rather than leaving it uninitialized. An uninitialized pointer holds a garbage address — dereferencing it corrupts some random piece of memory silently. A NULL pointer, if accidentally dereferenced, crashes immediately with a Segmentation Fault, which is actually preferable — a crash with a clear cause is infinitely easier to debug than a silent corruption that shows up as a wrong answer three functions later.",
-                    warning: "Dereferencing a NULL pointer crashes your program immediately with a Segmentation Fault. This is actually the intended behavior of NULL — it acts as a landmine that detonates loudly the moment you misuse it. Always check <code>if (ptr != NULL)</code> before dereferencing any pointer that might be NULL, especially pointers returned from functions like <code>malloc</code>."
+                    warning: "Dereferencing a NULL pointer crashes your program immediately with a Segmentation Fault. This is actually the intended behavior of NULL — it acts as a landmine that detonates loudly the moment you misuse it. Always check <code>if (ptr != NULL)</code> before dereferencing any pointer that might be NULL, especially pointers returned from functions like <code>malloc</code>.",
+                    tip: "NULL checks on every pointer before dereferencing is non-negotiable. The compiler warning flags <code>-Wall -Wextra</code>, covered in the 'Using the Compiler as Your First Debugger' lesson in this same module, will catch most of these automatically."
                 },
                 {
                     title: "Dangling Pointers",
