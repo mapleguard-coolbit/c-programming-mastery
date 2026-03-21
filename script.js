@@ -1017,9 +1017,9 @@ async function runCode() {
     outputArea.textContent = "Compiling and running...";
 
     try {
-        // Try Piston first, fall back to Judge0 if it fails
-        const result = await runWithPiston(code, stdinValue)
-                    ?? await runWithJudge0(code, stdinValue);
+        // Try Wandbox first (free, no auth, CORS-friendly), fall back to Godbolt
+        const result = await runWithWandbox(code, stdinValue)
+                    ?? await runWithGodbolt(code, stdinValue);
 
         outputArea.textContent = result ?? "// Both execution backends failed.\n// Check your internet connection and try again.";
     } finally {
@@ -1027,103 +1027,94 @@ async function runCode() {
         runBtn.textContent = 'Run Code';
     }
 }
- 
-// ── Piston API ────────────────────────────────────────────────
-// Free, no key, no meaningful rate limit. Returns output string
+
+// ── Wandbox API ───────────────────────────────────────────────
+// Free, no auth required, CORS-friendly. Returns output string
 // or null if the request failed at the network/HTTP level.
-async function runWithPiston(code, stdin) {
+async function runWithWandbox(code, stdin) {
     try {
-        const res = await fetch("https://emkc.org/api/v2/piston/execute", {
+        const res = await fetch("https://wandbox.org/api/compile.json", {
             method:  "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                language: "c",
-                version:  "*",
-                files:    [{ content: code }],
+                code:     code,
+                compiler: "gcc-head",
+                options:  "-Wall -std=c17",
                 stdin:    stdin
             })
         });
- 
-        if (!res.ok) return null;          // let Judge0 fallback handle it
- 
+
+        if (!res.ok) return null;   // fall through to Godbolt
+
         const data = await res.json();
- 
-        // Piston returns compile and run stages separately
-        const compile = data.compile ?? {};
-        const run     = data.run     ?? {};
- 
-        // Compile failed (non-zero exit from gcc)
-        if (compile.code !== 0 && compile.code !== null) {
-            return "Compilation Error:\n" + (compile.stderr || compile.output || "Unknown error.");
+
+        // Compilation failure
+        if (data.status !== "0" && data.compiler_error) {
+            return "Compilation Error:\n" + data.compiler_error;
         }
- 
+
         // Runtime output
         let out = "";
-        if (run.stdout) out += run.stdout;
-        if (run.stderr) out += (out ? "\n" : "") + "stderr:\n" + run.stderr;
-        if (run.signal) out += (out ? "\n" : "") + `Terminated by signal: ${run.signal}`;
- 
+        if (data.program_output) out += data.program_output;
+        if (data.program_error)  out += (out ? "\n" : "") + "stderr:\n" + data.program_error;
         return out || "// Program finished with no output.";
- 
+
     } catch {
-        return null;    // Network error — fall through to Judge0
+        return null;    // Network error — fall through to Godbolt
     }
 }
- 
-// ── Judge0 CE fallback ────────────────────────────────────────
-// Uses base64 encoding to avoid 400 errors from special chars
-// in raw JSON. Returns output string or null on failure.
-async function runWithJudge0(code, stdin) {
+
+// ── Godbolt (Compiler Explorer) fallback ─────────────────────
+// Free, no auth required, CORS-friendly. Uses gcc (latest) with
+// execute mode enabled. Returns output string or null on failure.
+async function runWithGodbolt(code, stdin) {
     try {
-        const b64 = str => btoa(unescape(encodeURIComponent(str)));
- 
-        const res = await fetch(
-            "https://ce.judge0.com/submissions?base64_encoded=true&wait=true", {
+        const res = await fetch("https://godbolt.org/api/compiler/cg132/compile", {
             method:  "POST",
             headers: {
                 "Content-Type": "application/json",
                 "Accept":       "application/json"
             },
             body: JSON.stringify({
-                source_code:  b64(code),
-                language_id:  50,           // C (GCC 9.2.0)
-                stdin:        b64(stdin)
+                source:  code,
+                options: {
+                    userArguments: "-std=c17 -Wall",
+                    executeParameters: {
+                        args:  [],
+                        stdin: stdin
+                    },
+                    compilerOptions: { executorRequest: true },
+                    filters:         { execute: true },
+                    tools:           []
+                },
+                lang:    "c",
+                allowStoreCodeDebug: false
             })
         });
- 
-        if (!res.ok) {
-            if (res.status === 429)
-                return "// Rate limit reached.\n// Please wait a moment and try again.";
-            return `// Execution server error (HTTP ${res.status}).\n// Try again shortly.`;
-        }
- 
+
+        if (!res.ok) return null;
+
         const data = await res.json();
- 
-        const decode = b64str => {
-            try { return b64str ? decodeURIComponent(escape(atob(b64str))) : ""; }
-            catch { return b64str ?? ""; }   // if already plain text, return as-is
-        };
- 
-        const statusId = data.status?.id;
- 
-        if (statusId === 6) {
-            return "Compilation Error:\n" + (decode(data.compile_output) || "Unknown compilation failure.");
+
+        // Build (compile) failure
+        if (data.buildResult && data.buildResult.code !== 0) {
+            const errors = (data.buildResult.stderr || [])
+                .map(l => l.text).join("\n");
+            return "Compilation Error:\n" + (errors || "Unknown compilation failure.");
         }
-        if (statusId === 5) {
-            return "// Time Limit Exceeded.\n// Your program ran too long and was terminated.";
+
+        // Runtime output
+        const stdout = (data.stdout || []).map(l => l.text).join("\n");
+        const stderr = (data.stderr || []).map(l => l.text).join("\n");
+
+        if (data.didExecute === false) {
+            return "Compilation Error:\n" + (stderr || "Unknown compilation failure.");
         }
-        if (statusId >= 7 && statusId <= 12) {
-            const signal = data.status?.description || "Runtime Error";
-            const stderr = decode(data.stderr);
-            return `Runtime Error: ${signal}\n` +
-                (stderr || "// Likely: segfault, div-by-zero, stack overflow, or UB.");
-        }
- 
-        let out = decode(data.stdout);
-        const err = decode(data.stderr);
-        if (err) out += (out ? "\n" : "") + "stderr:\n" + err;
+
+        let out = stdout;
+        if (stderr) out += (out ? "\n" : "") + "stderr:\n" + stderr;
         return out || "// Program finished with no output.";
- 
+
     } catch {
         return null;
     }
