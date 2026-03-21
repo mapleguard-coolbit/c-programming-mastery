@@ -924,76 +924,117 @@ function editCode(btn) {
 }
 
 async function runCode() {
-    const code = editorInstance.getValue();
-    const outputArea = document.getElementById('outputArea');
-    const stdinValue = document.getElementById('stdinArea').value || "";
-    outputArea.textContent = "Compiling and running... (Please wait)";
-
+    const code        = editorInstance.getValue();
+    const outputArea  = document.getElementById('outputArea');
+    const stdinValue  = document.getElementById('stdinArea').value || "";
+ 
+    outputArea.textContent = "Compiling and running...";
+ 
+    // Try Piston first, fall back to Judge0 if it fails
+    const result = await runWithPiston(code, stdinValue)
+                ?? await runWithJudge0(code, stdinValue);
+ 
+    outputArea.textContent = result ?? "// Both execution backends failed.\n// Check your internet connection and try again.";
+}
+ 
+// ── Piston API ────────────────────────────────────────────────
+// Free, no key, no meaningful rate limit. Returns output string
+// or null if the request failed at the network/HTTP level.
+async function runWithPiston(code, stdin) {
     try {
-        // Language ID 50 is C (GCC 9.2.0) on Judge0 API
-        const response = await fetch("https://ce.judge0.com/submissions?base64_encoded=false&wait=true", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            },
+        const res = await fetch("https://emkc.org/api/v2/piston/execute", {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                source_code: code,
-                language_id: 50,
-                stdin: stdinValue
+                language: "c",
+                version:  "*",
+                files:    [{ content: code }],
+                stdin:    stdin
             })
         });
-
-        // Handle HTTP-level errors without throwing into the generic catch
-        if (!response.ok) {
-            if (response.status === 429) {
-                outputArea.textContent = "// Rate limit reached on the Judge0 API.\n// Please wait a moment and try again.";
-            } else {
-                outputArea.textContent = `// Execution server returned HTTP ${response.status}.\n// Please try again shortly.`;
-            }
-            return;
+ 
+        if (!res.ok) return null;          // let Judge0 fallback handle it
+ 
+        const data = await res.json();
+ 
+        // Piston returns compile and run stages separately
+        const compile = data.compile ?? {};
+        const run     = data.run     ?? {};
+ 
+        // Compile failed (non-zero exit from gcc)
+        if (compile.code !== 0 && compile.code !== null) {
+            return "Compilation Error:\n" + (compile.stderr || compile.output || "Unknown error.");
         }
-
-        const data = await response.json();
-
-        // Judge0 status IDs:
-        //  1=In Queue  2=Processing  3=Accepted (success)
-        //  4=Wrong Answer  5=Time Limit Exceeded  6=Compilation Error
-        //  7-12=Runtime Errors (SIGABRT=7, SIGFPE=8, SIGKILL=9, SIGSEGV=11, etc.)
-        //  13=Internal Error  14=Exec Format Error
+ 
+        // Runtime output
+        let out = "";
+        if (run.stdout) out += run.stdout;
+        if (run.stderr) out += (out ? "\n" : "") + "stderr:\n" + run.stderr;
+        if (run.signal) out += (out ? "\n" : "") + `Terminated by signal: ${run.signal}`;
+ 
+        return out || "// Program finished with no output.";
+ 
+    } catch {
+        return null;    // Network error — fall through to Judge0
+    }
+}
+ 
+// ── Judge0 CE fallback ────────────────────────────────────────
+// Uses base64 encoding to avoid 400 errors from special chars
+// in raw JSON. Returns output string or null on failure.
+async function runWithJudge0(code, stdin) {
+    try {
+        const b64 = str => btoa(unescape(encodeURIComponent(str)));
+ 
+        const res = await fetch(
+            "https://ce.judge0.com/submissions?base64_encoded=true&wait=true", {
+            method:  "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept":       "application/json"
+            },
+            body: JSON.stringify({
+                source_code:  b64(code),
+                language_id:  50,           // C (GCC 9.2.0)
+                stdin:        b64(stdin)
+            })
+        });
+ 
+        if (!res.ok) {
+            if (res.status === 429)
+                return "// Rate limit reached.\n// Please wait a moment and try again.";
+            return `// Execution server error (HTTP ${res.status}).\n// Try again shortly.`;
+        }
+ 
+        const data = await res.json();
+ 
+        const decode = b64str => {
+            try { return b64str ? decodeURIComponent(escape(atob(b64str))) : ""; }
+            catch { return b64str ?? ""; }   // if already plain text, return as-is
+        };
+ 
         const statusId = data.status?.id;
-
-        if (statusId === 6 || data.compile_output) {
-            outputArea.textContent = "Compilation Error:\n" + (data.compile_output || "Unknown compilation failure.");
-
-        } else if (statusId === 5) {
-            outputArea.textContent = "// Time Limit Exceeded.\n// Your program ran too long and was terminated.";
-
-        } else if (statusId >= 7 && statusId <= 12) {
-            // Runtime error — segfault, SIGFPE (div-by-zero), stack overflow, UB, etc.
-            const signal = data.status?.description || "Runtime Error";
-            let msg = `Runtime Error: ${signal}\n`;
-            if (data.stderr) {
-                msg += data.stderr;
-            } else {
-                msg += "// No additional output captured.\n// Likely causes: segmentation fault, division by zero,\n// stack overflow, or undefined behaviour.";
-            }
-            outputArea.textContent = msg;
-
-        } else if (statusId === 13 || statusId === 14) {
-            outputArea.textContent = `// Execution server internal error (status ${statusId}).\n// Try again or simplify your program.`;
-
-        } else {
-            // Accepted (statusId === 3) or successful run
-            let out = "";
-            if (data.stdout) out += data.stdout;
-            if (data.stderr) out += (out ? "\n" : "") + "Warnings / stderr:\n" + data.stderr;
-            outputArea.textContent = out || "// Program finished with no output.";
+ 
+        if (statusId === 6) {
+            return "Compilation Error:\n" + (decode(data.compile_output) || "Unknown compilation failure.");
         }
-
-    } catch (error) {
-        // Only genuine network failures (offline, DNS, CORS) land here
-        outputArea.textContent = "// Could not reach the execution server.\n// Check your internet connection and try again.\n// (" + error.message + ")";
+        if (statusId === 5) {
+            return "// Time Limit Exceeded.\n// Your program ran too long and was terminated.";
+        }
+        if (statusId >= 7 && statusId <= 12) {
+            const signal = data.status?.description || "Runtime Error";
+            const stderr = decode(data.stderr);
+            return `Runtime Error: ${signal}\n` +
+                (stderr || "// Likely: segfault, div-by-zero, stack overflow, or UB.");
+        }
+ 
+        let out = decode(data.stdout);
+        const err = decode(data.stderr);
+        if (err) out += (out ? "\n" : "") + "stderr:\n" + err;
+        return out || "// Program finished with no output.";
+ 
+    } catch {
+        return null;
     }
 }
 
