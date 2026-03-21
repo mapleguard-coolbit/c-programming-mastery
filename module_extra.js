@@ -1,5 +1,5 @@
 const ModuleExtra = {
-    description: "The gaps and C23 additions: type casting, command-line args, const correctness, atomics, the stdlib functions you'll actually use — plus C23's strdup, stdbit.h bit utilities, checked integer arithmetic, and memccpy.",
+    description: "The gaps and C23 additions: type casting, command-line args, const correctness, atomics, the stdlib functions you'll actually use — plus C23's strdup, stdbit.h, checked arithmetic — and a final lesson on where to go next: projects, tools, references, and the real C codebases worth reading.",
 
     lessons: [
         {
@@ -823,6 +823,60 @@ int main(void) {
                     output: `Copied up to '!': Hello, World!
 Remaining:  More text here
 Built string: 'Hello World'`
+                }
+            ]
+        },
+        {
+            id: "what-next",
+            title: "What Next? Life After This Curriculum",
+            explanation: "You've covered the language from first principles through C23. That's the foundation — but C mastery is built through practice on real problems, reading real codebases, and using the tools the C ecosystem actually relies on. This lesson is a map of where to go from here.",
+            sections: [
+                {
+                    title: "Projects That Will Teach You More Than Any Tutorial",
+                    content: "The fastest path to genuine C proficiency is building things with a hard constraint: no external libraries, no shortcuts. These projects force you to confront memory management, data structures, and system interfaces directly.",
+                    points: [
+                        "<strong>Write a memory allocator</strong>: Implement <code>malloc</code>, <code>free</code>, and <code>realloc</code> from scratch using <code>sbrk</code> or <code>mmap</code>. You'll understand heap layout, fragmentation, alignment, and why free-list management is hard. This is the project that makes pointers click permanently.",
+                        "<strong>Write a shell</strong>: A basic Unix shell (<code>fork</code>, <code>exec</code>, <code>pipe</code>, <code>wait</code>) teaches process management, file descriptors, and signal handling better than any textbook. The classic tutorial is Stephen Brennan's 'Write a Shell in C'.",
+                        "<strong>Write a hash table</strong>: A generic hash table with open addressing and a load factor resize teaches you type-generic C design (function pointers as comparators and hash functions), struct design, and amortized complexity.",
+                        "<strong>Write a JSON parser</strong>: A recursive descent parser for a small data format (JSON or a simple expression language) teaches you string processing, memory management for tree structures, and error handling — and gives you something actually useful.",
+                        "<strong>Write a tiny interpreter</strong>: A stack-based bytecode VM for a tiny language (even just arithmetic with variables) is the project that teaches you everything about how C's own runtime works."
+                    ]
+                },
+                {
+                    title: "Essential Reference Material",
+                    content: "These are the resources that working C programmers actually use — not tutorials for beginners, but references and deeper material you'll return to repeatedly.",
+                    points: [
+                        "<strong>cppreference.com</strong> — The best online C standard library reference. More accurate and readable than the actual standard. Bookmark it. Every function, every macro, with examples and notes on undefined behavior.",
+                        "<strong>The C Programming Language (K&R)</strong> — Kernighan and Ritchie. Short, dense, and still relevant. The exercises in Chapter 8 (the Unix system interface) are worth doing even now.",
+                        "<strong>Computer Systems: A Programmer's Perspective (CSAPP)</strong> — Bryant and O'Hallaron. The book that explains why C works the way it does: data representation, the memory hierarchy, linking, exceptional control flow, virtual memory, concurrency. Read Chapters 2 and 3 at minimum.",
+                        "<strong>Godbolt Compiler Explorer (godbolt.org)</strong> — Paste C code, see the assembly output from GCC, Clang, and MSVC side by side. Essential for understanding what the optimizer actually does with your code.",
+                        "<strong>The C17/C23 standard drafts</strong> — Freely available online. You don't read them cover to cover, but you do ctrl-F specific clauses when you need the authoritative answer about behavior.",
+                        "<strong>Modern C (Gustedt)</strong> — The book this curriculum is based on. Now that you've done the course, read it cover to cover. The deeper treatment of the abstract machine, strict aliasing, and type-generic programming will land differently."
+                    ]
+                },
+                {
+                    title: "Tools Every C Developer Needs",
+                    content: "Knowing the language is necessary but not sufficient. These tools are what professional C development actually looks like.",
+                    points: [
+                        "<strong>GCC and Clang</strong>: Use both. They have different warnings and different sanitizer diagnostics. A program that compiles cleanly under both with <code>-Wall -Wextra -Wpedantic</code> is a much stronger signal of correctness than one that compiles under just one.",
+                        "<strong>AddressSanitizer + UBSanitizer</strong>: <code>-fsanitize=address,undefined</code>. If you take away one habit from this curriculum, let it be: always run your test suite with sanitizers enabled.",
+                        "<strong>Valgrind</strong>: For leak checking when ASan's overhead is too high, and for profiling with Callgrind. <code>valgrind --leak-check=full --show-leak-kinds=all ./prog</code>.",
+                        "<strong>gdb</strong>: The GNU debugger. Learn 10 commands: <code>run</code>, <code>break</code>, <code>next</code>, <code>step</code>, <code>print</code>, <code>backtrace</code>, <code>info locals</code>, <code>watch</code>, <code>continue</code>, <code>quit</code>. That's enough to debug 90% of crashes.",
+                        "<strong>clang-format</strong>: Automated code formatting. Stop arguing about style; just run the formatter. A consistent style makes code reviews faster and diffs cleaner.",
+                        "<strong>clang-tidy</strong>: A linter that catches issues beyond what compiler warnings flag — potential null dereferences, performance anti-patterns, and modernization suggestions."
+                    ]
+                },
+                {
+                    title: "Where C is Actually Used",
+                    content: "Knowing where C lives in the real world helps you pick the right next projects and understand why the language is designed the way it is.",
+                    points: [
+                        "<strong>Operating system kernels</strong>: Linux, the BSDs, and most embedded RTOSes are written in C. Reading the Linux kernel source is humbling and educational — start with <code>kernel/sched/core.c</code> or a simple driver.",
+                        "<strong>Language runtimes</strong>: CPython, Ruby MRI, PHP's Zend engine, and Lua are C. If you want to understand how interpreted languages work, read their source.",
+                        "<strong>Databases</strong>: PostgreSQL and SQLite are excellent C codebases. SQLite in particular is exceptionally well-commented and is one of the most thoroughly tested C programs in existence.",
+                        "<strong>Embedded systems</strong>: Microcontrollers (AVR, ARM Cortex-M, ESP32) are almost exclusively programmed in C. If you want to write C that controls hardware, Arduino's core is C with a thin C++ wrapper.",
+                        "<strong>Network infrastructure</strong>: nginx, Redis, memcached, and most network daemons are C. Performance-critical, concurrent, and heavily reliant on the system call interface."
+                    ],
+                    tip: "Pick one real C codebase and read it. Not all of it — pick a file or subsystem that interests you and understand every line. SQLite's <code>btree.c</code>, Redis's <code>dict.c</code>, or Linux's <code>mm/slub.c</code>. Reading real code written by experts teaches things that no tutorial can."
                 }
             ]
         }

@@ -1,5 +1,5 @@
 const ModuleLowLevel = {
-    description: "The heart of C: Pointers, dynamic memory, function pointers, and C11/C23 memory alignment with alignof, alignas, and _Static_assert. Direct memory manipulation plus the tools to verify your assumptions at compile time.",
+    description: "The heart of C: Pointers, dynamic memory, function pointers, C11/C23 memory alignment — plus two essential professional skills: using compiler warnings and sanitizers as your first line of defence, and a deep treatment of undefined behavior and why it's the most dangerous concept in C.",
     
     lessons: [
         {
@@ -491,6 +491,239 @@ sequence at offset:  4`,
                     warning: "Struct layout is not guaranteed unless the compiler is specifically told to pack it. Compilers insert padding between struct members for alignment. Use <code>offsetof</code> and <code>_Static_assert</code> together to verify wire-protocol struct layouts, especially when receiving data over the network or from files."
                 }
             ]
+        },
+        {
+            id: "compiler-warnings",
+            title: "Using the Compiler as Your First Debugger",
+            explanation: "The C compiler is not just a translator — it's the most powerful static analysis tool you have, and it's free. But its default behavior is to stay quiet about suspicious code. The flags you pass at compile time determine whether you get a silent binary or a detailed report of every questionable pattern in your code. Professional C development means always compiling with warnings enabled and treating warnings as errors.",
+            sections: [
+                {
+                    title: "The Essential Warning Flags",
+                    content: "GCC and Clang share a common set of warning flags. These are the ones every C developer should use by default:",
+                    points: [
+                        "<code>-Wall</code>: Enables a curated set of 'important' warnings. Despite the name, it does not enable <em>all</em> warnings — just the ones GCC considers high-signal.",
+                        "<code>-Wextra</code>: Enables additional warnings that <code>-Wall</code> misses: unused parameters, missing field initializers, sign comparison mismatches, and more.",
+                        "<code>-Wconversion</code>: Warns whenever a value is implicitly converted in a way that could silently lose data — e.g. assigning a <code>double</code> to an <code>int</code>, or a <code>long</code> to a <code>short</code>.",
+                        "<code>-Wshadow</code>: Warns when a local variable shadows an outer variable of the same name — a common source of subtle bugs.",
+                        "<code>-Werror</code>: Promotes all warnings to hard errors. The build fails until every warning is fixed. This is what 'zero warnings' actually means in practice.",
+                        "<code>-pedantic</code> or <code>-Wpedantic</code>: Enforces strict conformance to the C standard and warns about GNU extensions."
+                    ],
+                    code: `// Compile with:
+// gcc -std=c23 -Wall -Wextra -Wconversion -Wshadow -Werror program.c
+
+#include <stdio.h>
+
+// -Wconversion catches this:
+void bad_conversion(void) {
+    double d = 3.99;
+    int    i = d;      // WARNING: implicit conversion from double to int loses .99
+    printf("%d\n", i);
+}
+
+// -Wshadow catches this:
+int x = 10;           // global x
+void shadow_example(void) {
+    int x = 20;        // WARNING: 'x' shadows outer variable
+    printf("%d\n", x);
+}
+
+// -Wall catches this:
+int maybe_uninit(int flag) {
+    int result;
+    if (flag) result = 1;
+    return result;     // WARNING: may be used uninitialized
+}
+
+int main(void) {
+    bad_conversion();
+    shadow_example();
+    printf("%d\n", maybe_uninit(1));
+    return 0;
+}`,
+                    warning: "Adding <code>-Werror</code> to existing codebases can be brutal — you may suddenly have hundreds of errors to fix. The pragmatic approach: add it to new projects from day one, and add warnings incrementally to existing projects module by module."
+                },
+                {
+                    title: "Reading Compiler Error Messages",
+                    content: "GCC and Clang error messages follow a consistent format: <code>filename:line:column: severity: message</code>. Learning to read them efficiently saves enormous debugging time. Clang's errors are generally cleaner and more actionable than GCC's.",
+                    code: `// This broken program produces several instructive errors:
+#include <stdio.h>
+
+int add(int a, int b) {
+    return a + b
+}                        // ERROR: expected ';' before '}'
+
+int main(void) {
+    int result = add(1, 2, 3);  // ERROR: too many arguments
+    printf("%s\n", result);     // WARNING: format '%s' expects char*, got int
+    
+    int *p = NULL;
+    *p = 5;                      // No compile error, but runtime crash (null deref)
+    
+    return 0
+}                        // ERROR: expected ';' before '}'`,
+                    output: `program.c:5:1: error: expected ';' before '}'
+program.c:9:28: error: too many arguments to function 'add'
+program.c:10:20: warning: format '%s' expects 'char *' but arg has type 'int'
+program.c:15:1: error: expected ';' before '}'`,
+                    tip: "Always fix the <em>first</em> error first. A single missing bracket or semicolon causes a cascade of false errors on subsequent lines. Fix one, recompile, repeat. Chasing the fifth error when the first is still there is wasted effort."
+                },
+                {
+                    title: "Runtime Analysis Tools: AddressSanitizer and UBSan",
+                    content: "Some bugs can't be caught at compile time because they depend on runtime values. AddressSanitizer (ASan) and Undefined Behavior Sanitizer (UBSan) are compiler-instrumented runtime checkers that catch bugs the compiler itself can't diagnose — with minimal setup.",
+                    points: [
+                        "<code>-fsanitize=address</code>: AddressSanitizer. Catches heap buffer overflows, stack buffer overflows, use-after-free, use-after-return, and memory leaks. Typically 2× slowdown. Use during development and testing.",
+                        "<code>-fsanitize=undefined</code>: UBSan. Catches signed integer overflow, null pointer dereference, misaligned access, array index out of bounds, and more. Very low overhead.",
+                        "<code>-fsanitize=address,undefined</code>: Combine both. The standard practice for test builds.",
+                        "<code>-g</code>: Always add debug symbols when using sanitizers so error messages show file names and line numbers."
+                    ],
+                    code: `// Compile: gcc -std=c23 -g -fsanitize=address,undefined -o prog prog.c
+
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(void) {
+    int arr[5] = {1, 2, 3, 4, 5};
+    
+    // UBSan catches this at runtime:
+    printf("%d\n", arr[10]);   // out-of-bounds
+    
+    // ASan catches this at runtime:
+    int *p = malloc(sizeof(int));
+    *p = 42;
+    free(p);
+    printf("%d\n", *p);        // use-after-free
+    
+    return 0;
+}`,
+                    output: `RUNTIME ERROR: index 10 out of bounds for type 'int[5]'
+  at prog.c:9
+=================================================================
+ERROR: AddressSanitizer: heap-use-after-free on address 0x... at pc ...
+READ of size 4 at 0x... thread T0
+  #0 main prog.c:15`,
+                    tip: "The standard professional workflow: <strong>develop</strong> with <code>-Wall -Wextra -Werror</code>, <strong>test</strong> with <code>-fsanitize=address,undefined -g</code>, <strong>release</strong> with <code>-O2 -DNDEBUG</code>. These three build configurations catch the vast majority of C bugs before they reach production."
+                }
+            ]
+        },
+        {
+            id: "undefined-behavior",
+            title: "Undefined Behavior: What It Is and Why It Matters",
+            explanation: "Undefined behavior (UB) is the single most dangerous concept in C. When your code invokes UB, the C standard places <em>no requirements</em> on what happens — the compiler may produce any output, silently corrupt memory, erase data, or generate code that works perfectly in debug mode and catastrophically fails in release. UB is not a runtime error you can catch — it's a contract violation that the compiler is allowed to assume never happens, and it uses that assumption to generate faster, smaller code. Understanding UB is what separates C programmers who ship reliable software from those who get lucky.",
+            sections: [
+                {
+                    title: "The Abstract Machine",
+                    content: "C doesn't describe what your CPU does. It describes an <strong>abstract machine</strong> — a fictional computer with specific rules. The compiler's job is to generate real machine code that behaves identically to the abstract machine <em>for well-defined programs</em>. For programs with UB, the abstract machine makes no promises at all. The compiler is not required to diagnose UB, warn about it, or handle it gracefully. It can — and does — use UB as a license to optimize aggressively.",
+                    points: [
+                        "<strong>UB is a compile-time contract, not a runtime check.</strong> The compiler assumes UB never happens. If it does, all bets are off — the resulting binary may do anything.",
+                        "<strong>UB is not the same as implementation-defined behavior.</strong> Implementation-defined means the compiler must document what it does (e.g. <code>sizeof(int)</code> on a specific platform). UB means no documentation required — anything can happen.",
+                        "<strong>UB can reach backward in time.</strong> Because the compiler can reorder and eliminate code based on UB assumptions, a bug on line 50 can corrupt results that were printed on line 10. This is why UB bugs are so hard to find.",
+                        "<strong>Debug and release builds differ.</strong> UB often appears to work in debug builds (where optimization is off) and silently fails in release builds (where the optimizer exploits UB assumptions). Never use 'it works in debug' as a correctness argument."
+                    ]
+                },
+                {
+                    title: "The Most Common Forms of UB",
+                    content: "These are the UB categories that appear most frequently in real C code. Each has a specific rule it violates in the C standard.",
+                    points: [
+                        "<strong>Signed integer overflow</strong>: <code>INT_MAX + 1</code> is UB. The compiler assumes signed overflow never happens — it uses this to prove loop termination and eliminate overflow checks. <em>Unsigned</em> overflow is defined: it wraps modulo 2^N.",
+                        "<strong>Out-of-bounds array access</strong>: Reading or writing past the end of an array. The most common source of security vulnerabilities in C code.",
+                        "<strong>Use after free</strong>: Accessing memory after <code>free()</code>. The allocator may have given that memory to someone else.",
+                        "<strong>Null pointer dereference</strong>: <code>*ptr</code> when ptr is NULL. The compiler may eliminate null checks entirely based on the assumption you never do this.",
+                        "<strong>Uninitialized reads</strong>: Reading a variable that was never written. The value is not just unpredictable — the behavior of the entire program becomes undefined.",
+                        "<strong>Data races</strong>: Two threads reading and writing the same memory without synchronization (without <code>_Atomic</code> or a mutex). Results are undefined even if one of the accesses is a read.",
+                        "<strong>Strict aliasing violation</strong>: Accessing the same memory through two pointers of incompatible types (e.g. reading a <code>float</code> through an <code>int*</code>). The compiler assumes pointers of different types don't alias and optimizes accordingly."
+                    ],
+                    code: `#include <stdio.h>
+#include <limits.h>
+
+int main(void) {
+    // UB: signed integer overflow
+    int x = INT_MAX;
+    int y = x + 1;          // UB — compiler may assume this never happens
+    printf("%d\\n", y);      // Could print anything, or be eliminated
+
+    // UB: use of uninitialized variable
+    int uninit;
+    printf("%d\\n", uninit); // UB — not just a garbage value; the compiler
+                             // may generate wrong code for the whole function
+
+    // DEFINED: unsigned wraparound
+    unsigned int u = UINT_MAX;
+    unsigned int w = u + 1;  // Defined: wraps to 0
+    printf("%u\\n", w);       // Always prints 0
+
+    return 0;
+}`,
+                    output: "(signed overflow and uninit: undefined — anything can happen)\n0",
+                    warning: "The signed overflow and uninitialized read examples above are UB. On many platforms in debug mode they appear to 'work' — but this is accidental. Compile with <code>-fsanitize=undefined</code> and they'll be caught at runtime. Compile with <code>-O2</code> and the optimizer may make them do something completely unexpected."
+                },
+                {
+                    title: "How the Compiler Exploits UB",
+                    content: "This is the part that surprises most C programmers. The compiler actively uses UB assumptions to eliminate code and reorder operations — and it's allowed to do so.",
+                    code: `#include <stdio.h>
+#include <limits.h>
+
+// The optimizer sees: if i > i+1, that would be signed overflow (UB).
+// Therefore i > i+1 can never be true for a valid program.
+// Therefore the if branch can be eliminated entirely.
+void surprise(int i) {
+    if (i > i + 1) {
+        printf("This line may be compiled away entirely\\n");
+    }
+}
+
+// The optimizer sees: ptr != NULL was checked, so ptr is not NULL here.
+// A later null check on the same pointer is redundant — eliminated.
+void eliminate_check(int *ptr) {
+    *ptr = 42;           // If we get here, ptr is not null (null deref = UB)
+    if (ptr == NULL) {   // This check is eliminated: ptr can't be null
+        printf("never\\n"); // because derefing null above would be UB
+    }
+}
+
+int main(void) {
+    surprise(INT_MAX);   // No output
+    int x = 1;
+    eliminate_check(&x); // "never" never prints
+    return 0;
+}`,
+                    output: "(no output — both branches eliminated by optimizer)",
+                    tip: "This is not a compiler bug — this is the compiler doing exactly what the standard allows. The programmer wrote UB; the compiler assumed it doesn't happen; the optimization followed logically. The solution is never to write UB, not to blame the compiler."
+                },
+                {
+                    title: "Sanitizers: Your UB Detection Tools",
+                    content: "The compiler can instrument your binary to detect UB at runtime. These sanitizers add checks that catch UB as it happens, turning silent corruption into immediate crashes with stack traces.",
+                    points: [
+                        "<strong>AddressSanitizer (ASan)</strong>: <code>-fsanitize=address</code> — Detects out-of-bounds reads/writes, use-after-free, double-free, use-after-return. ~2x slowdown. The most essential sanitizer for C.",
+                        "<strong>UndefinedBehaviorSanitizer (UBSan)</strong>: <code>-fsanitize=undefined</code> — Detects signed overflow, shift out of bounds, null dereferences, invalid casts, misaligned access. Very low overhead (~10%).",
+                        "<strong>MemorySanitizer (MSan)</strong>: <code>-fsanitize=memory</code> — Detects reads of uninitialized memory. ~3x slowdown. Clang only.",
+                        "<strong>ThreadSanitizer (TSan)</strong>: <code>-fsanitize=thread</code> — Detects data races. ~5-15x slowdown. Essential for multithreaded code.",
+                        "<strong>Valgrind</strong>: Not a compiler flag — a separate tool. Slower than ASan but requires no recompilation. Run with <code>valgrind --leak-check=full ./program</code>."
+                    ],
+                    code: `/* Compile: gcc -fsanitize=address,undefined -g -o prog prog.c
+   Run:     ./prog
+
+   ASan output on overflow:
+   ==ERROR== AddressSanitizer: heap-buffer-overflow
+   WRITE of size 4 at 0x... pc 0x... (main+0x...)
+
+   UBSan output on signed overflow:
+   prog.c:5:16: runtime error: signed integer overflow:
+   2147483647 + 1 cannot be represented in type 'int'
+*/
+
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(void) {
+    int *arr = malloc(3 * sizeof(int));
+    // UB: write past end of 3-element array
+    arr[3] = 42;   // ASan catches this immediately
+    free(arr);
+    return 0;
+}`,
+                    tip: "Make sanitizers part of your normal development loop, not a one-time check. Add them to your debug build configuration permanently: <code>CFLAGS = -Wall -Wextra -Werror -g -fsanitize=address,undefined</code>. The small performance cost in dev is worth catching bugs before they ship."
+                }
+            ]
         }
     ],
     
@@ -554,6 +787,24 @@ sequence at offset:  4`,
             options: ["Prints a custom error and exits", "Prints the system error message for the current errno", "Clears errno", "Returns the errno value"],
             answer: 1,
             explanation: "perror prints a human-readable description of the last error set in errno, prefixed by your string. Essential for diagnosing failed system calls."
+        },
+        {
+            question: "Signed integer overflow in C is:",
+            options: ["Defined: wraps like unsigned", "Undefined behavior — compiler may assume it never happens", "Implementation-defined on all platforms", "A compile-time error"],
+            answer: 1,
+            explanation: "Signed overflow is UB. The compiler uses this assumption to optimize — it may eliminate overflow checks or produce completely unexpected results. Unsigned overflow wraps modulo 2^N and is well-defined."
+        },
+        {
+            question: "Which flag combination catches memory errors AND undefined behavior at runtime?",
+            options: ["-O2 -DNDEBUG", "-Wall -Wextra", "-fsanitize=address,undefined -g", "-pedantic -std=c23"],
+            answer: 2,
+            explanation: "AddressSanitizer catches buffer overflows and use-after-free. UBSan catches signed overflow, null dereferences, and misalignment. -g adds debug info for readable stack traces."
+        },
+        {
+            question: "Why can UB appear to corrupt results on lines BEFORE the problematic statement?",
+            options: ["It cannot — UB only affects later lines", "The CPU executes instructions out of order", "The optimizer reorders or eliminates code based on UB assumptions, affecting earlier behavior", "It is a debugger display artifact"],
+            answer: 2,
+            explanation: "The optimizer reasons globally. If it determines a value can only exist through a UB path, it may eliminate preceding checks. The binary can behave differently from the source even for lines written before the UB."
         }
     ],
     
