@@ -353,6 +353,7 @@ function renderLesson(moduleId, lessonId) {
     document.getElementById('lessonBadge').style.color = ModuleColors[moduleId];
     document.getElementById('lessonTitle').textContent = lesson.title;
     document.getElementById('breadcrumb').textContent = `${ModuleNames[moduleId]} > ${lesson.title}`;
+    document.title = `${lesson.title} – ${ModuleNames[moduleId]} | C Programming Mastery`;
     
     const lessonContent = document.getElementById('lessonContent');
     lessonContent.innerHTML = renderLessonContent(lesson);
@@ -632,6 +633,7 @@ function renderPractice(moduleId) {
     document.getElementById('practiceTitle').textContent = `${ModuleNames[moduleId]} Practice`;
     document.getElementById('practiceModule').textContent = ModuleNames[moduleId];
     document.getElementById('breadcrumb').textContent = `${ModuleNames[moduleId]} > Practice`;
+    document.title = `${ModuleNames[moduleId]} Practice | C Programming Mastery`;
     
     const practiceList = document.getElementById('practiceList');
     let html = '';
@@ -703,6 +705,7 @@ function renderQuiz(moduleId) {
     
     document.getElementById('quizTitle').textContent = `${ModuleNames[moduleId]} Quiz`;
     document.getElementById('breadcrumb').textContent = `${ModuleNames[moduleId]} > Quiz`;
+    document.title = `${ModuleNames[moduleId]} Quiz | C Programming Mastery`;
     document.getElementById('quizResults').classList.add('hidden');
     document.getElementById('quizNav').classList.remove('hidden');
     
@@ -848,6 +851,7 @@ function renderExam(moduleId) {
     document.getElementById('examTitle').textContent = `${ModuleNames[moduleId]} Exam`;
     document.getElementById('examInfo').textContent = `${module.exam.length} Questions | No Time Limit`;
     document.getElementById('breadcrumb').textContent = `${ModuleNames[moduleId]} > Exam`;
+    document.title = `${ModuleNames[moduleId]} Exam | C Programming Mastery`;
     document.getElementById('examResults').classList.add('hidden');
     
     renderExamQuestions();
@@ -1000,14 +1004,23 @@ async function runCode() {
     const code        = editorInstance.getValue();
     const outputArea  = document.getElementById('outputArea');
     const stdinValue  = document.getElementById('stdinArea').value || "";
- 
+    const runBtn      = document.getElementById('runCode');
+
+    // Disable button while running to prevent duplicate requests
+    runBtn.disabled = true;
+    runBtn.textContent = 'Running…';
     outputArea.textContent = "Compiling and running...";
- 
-    // Try Piston first, fall back to Judge0 if it fails
-    const result = await runWithPiston(code, stdinValue)
-                ?? await runWithJudge0(code, stdinValue);
- 
-    outputArea.textContent = result ?? "// Both execution backends failed.\n// Check your internet connection and try again.";
+
+    try {
+        // Try Piston first, fall back to Judge0 if it fails
+        const result = await runWithPiston(code, stdinValue)
+                    ?? await runWithJudge0(code, stdinValue);
+
+        outputArea.textContent = result ?? "// Both execution backends failed.\n// Check your internet connection and try again.";
+    } finally {
+        runBtn.disabled = false;
+        runBtn.textContent = 'Run Code';
+    }
 }
  
 // ── Piston API ────────────────────────────────────────────────
@@ -1277,6 +1290,13 @@ function setupEventListeners() {
     });
     document.getElementById('runCode').addEventListener('click', runCode);
     document.getElementById('resetCode').addEventListener('click', resetCode);
+
+    // Close code modal on Escape key (mirrors the donate flyout behaviour)
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !document.getElementById('codeModal').classList.contains('hidden')) {
+            document.getElementById('codeModal').classList.add('hidden');
+        }
+    });
     
     // Practice cards
     document.getElementById('practiceList').addEventListener('click', (e) => {
@@ -1291,6 +1311,7 @@ function setupEventListeners() {
 function showDashboard() {
     App.currentModule = null;
     App.currentLesson = null;
+    document.title = 'C Programming Mastery – Free Interactive C Tutorial (Beginner to C23)';
     renderNavigation();
     renderDashboard();
     showView('dashboard');
