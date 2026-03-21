@@ -185,6 +185,7 @@ a:hover { color: var(--accent-dim); }
 
 .sidebar.collapsed .logo-text {
     opacity: 0;
+    color: var(--text-primary);
 }
 
 .sidebar-toggle {
