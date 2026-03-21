@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://cprogramming.static.app/sitemap.xml
+Sitemap: https://c-mastery.github.io/sitemap.xml
