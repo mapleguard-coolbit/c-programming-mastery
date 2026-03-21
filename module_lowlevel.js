@@ -213,6 +213,107 @@ int main() {
             ]
         },
         {
+            id: "double-pointer",
+            title: "Pointer to Pointer (**)",
+            explanation: "A pointer stores a memory address. A pointer to a pointer stores the address of a pointer. This sounds recursive and slightly unhinged, but it has concrete, practical uses that come up constantly: modifying a pointer from inside a function, working with 2D dynamic arrays, and handling arrays of strings. If single pointers make you think of arrows pointing to data, double pointers are arrows pointing to other arrows.",
+            sections: [
+                {
+                    title: "The Concept",
+                    content: "A regular <code>int *p</code> stores the address of an integer. An <code>int **pp</code> stores the address of an <code>int*</code>. Dereferencing once (<code>*pp</code>) gives you the pointer. Dereferencing twice (<code>**pp</code>) gives you the integer. Every level of indirection is just 'follow this address to the next thing'.",
+                    code: `#include <stdio.h>
+ 
+int main() {
+    int   value = 42;
+    int  *ptr   = &value;   // ptr holds address of value
+    int **pptr  = &ptr;     // pptr holds address of ptr
+ 
+    printf("value:  %d\\n",  value);   // 42
+    printf("*ptr:   %d\\n",  *ptr);    // 42  (dereference once)
+    printf("**pptr: %d\\n",  **pptr);  // 42  (dereference twice)
+ 
+    // Modifying through two levels of indirection
+    **pptr = 100;
+    printf("value is now: %d\\n", value); // 100
+ 
+    return 0;
+}`
+                },
+                {
+                    title: "Modifying a Pointer from a Function",
+                    content: "The most common real-world use of <code>**</code>: you want a function to modify a pointer in the caller. Remember that C passes everything by value — including pointers. If a function takes <code>int *p</code>, it gets a copy of the pointer. Changing the copy doesn't affect the original. To change the original pointer, you pass a pointer to the pointer.",
+                    code: `#include <stdio.h>
+#include <stdlib.h>
+ 
+// This tries to allocate memory and update the caller's pointer.
+// Takes int** so it can modify the caller's int* variable.
+void allocate(int **ptr, int size) {
+    *ptr = malloc(size * sizeof(int));  // Writes to the caller's pointer
+    if (*ptr) {
+        for (int i = 0; i < size; i++) {
+            (*ptr)[i] = i + 1;          // Note: (*ptr)[i], not *ptr[i]
+        }
+    }
+}
+ 
+int main() {
+    int *data = NULL;
+ 
+    allocate(&data, 5);   // Pass address of the pointer
+ 
+    if (data) {
+        for (int i = 0; i < 5; i++) {
+            printf("%d ", data[i]);
+        }
+        printf("\\n");
+        free(data);
+    }
+ 
+    return 0;
+}`,
+                    output: "1 2 3 4 5",
+                    tip: "The parentheses in <code>(*ptr)[i]</code> are mandatory. Without them, <code>*ptr[i]</code> is parsed as <code>*(ptr[i])</code> — pointer arithmetic on <code>ptr</code> itself, then a dereference. That is not what you want. When in doubt, parenthesize."
+                },
+                {
+                    title: "Arrays of Strings (char **)",
+                    content: "The most visible use of double pointers in C is <code>char **argv</code> — the command-line argument array in <code>main</code>. Each <code>argv[i]</code> is a <code>char*</code> (a string). The array of those strings is a <code>char**</code>. This same pattern applies any time you have a dynamically-allocated array of strings.",
+                    code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+ 
+// Build a dynamic array of strings
+char **build_list(int count) {
+    // Allocate array of count char* pointers
+    char **list = malloc(count * sizeof(char *));
+ 
+    char *fruits[] = {"apple", "banana", "cherry", "date"};
+    for (int i = 0; i < count; i++) {
+        list[i] = malloc(strlen(fruits[i]) + 1);
+        strcpy(list[i], fruits[i]);
+    }
+    return list;
+}
+ 
+void free_list(char **list, int count) {
+    for (int i = 0; i < count; i++) free(list[i]);
+    free(list);
+}
+ 
+int main() {
+    int n = 4;
+    char **fruits = build_list(n);
+ 
+    for (int i = 0; i < n; i++) {
+        printf("fruits[%d] = %s\\n", i, fruits[i]);
+    }
+ 
+    free_list(fruits, n);
+    return 0;
+}`,
+                    output: "fruits[0] = apple\nfruits[1] = banana\nfruits[2] = cherry\nfruits[3] = date"
+                }
+            ]
+        },
+        {
             id: "dynamic-memory",
             title: "Dynamic Memory Allocation",
             explanation: "Every array and variable we've created so far had a fixed size decided at compile time — before the program runs. But real programs often don't know how much memory they'll need until runtime: a user might enter 5 items or 5000. Dynamic memory allocation lets you request memory from the operating system while the program is actually running. That memory comes from a region called the Heap, which is large and flexible — but unlike the Stack, it requires you to manage it yourself.",

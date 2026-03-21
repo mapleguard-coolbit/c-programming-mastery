@@ -200,6 +200,85 @@ int main() {
 }`,
                     output: "10 20 30 40 50 ",
                     tip: "Notice that inside the struct definition, we use <code>struct Node *next</code> — not <code>Node *next</code>. This is because the <code>typedef</code> alias isn't available yet when the struct body is being defined. To use <code>Node *next</code> directly, you can give the struct a tag name: <code>typedef struct Node { int value; struct Node *next; } Node;</code> — the tag (<code>struct Node</code>) is available immediately, even inside its own definition."
+                },
+                {
+                    title: "Bit Fields: Packing Data at the Bit Level",
+                    content: "A bit field is a struct member declared with a colon and a bit width. Instead of allocating a full byte (or more) for a small value that only needs a few bits, the compiler packs multiple bit fields into a single integer. This is essential in embedded programming, network protocol headers, and anywhere memory density matters more than access speed.",
+                    code: `#include <stdio.h>
+ 
+// A hardware register layout: 16 bits total
+// packed into fields without wasting a byte
+struct StatusRegister {
+    unsigned int error    : 1;  // 1 bit:  0 or 1
+    unsigned int ready    : 1;  // 1 bit:  0 or 1
+    unsigned int mode     : 2;  // 2 bits: 0-3
+    unsigned int priority : 4;  // 4 bits: 0-15
+    unsigned int reserved : 8;  // 8 bits: padding to fill 16 bits
+};
+ 
+// A practical example: IPv4 header fields
+struct IPv4Flags {
+    unsigned int reserved : 1;   // always 0
+    unsigned int df       : 1;   // Don't Fragment
+    unsigned int mf       : 1;   // More Fragments
+};
+ 
+int main() {
+    struct StatusRegister reg = {0};
+    reg.error    = 1;
+    reg.ready    = 1;
+    reg.mode     = 2;
+    reg.priority = 7;
+ 
+    printf("error:    %u\\n", reg.error);
+    printf("ready:    %u\\n", reg.ready);
+    printf("mode:     %u\\n", reg.mode);
+    printf("priority: %u\\n", reg.priority);
+    printf("total size: %zu bytes\\n", sizeof(reg));
+ 
+    return 0;
+}`,
+                    output: "error:    1\nready:    1\nmode:     2\npriority: 7\ntotal size: 4 bytes",
+                    warning: "Bit field layout (order, padding, alignment) is implementation-defined — the C standard deliberately leaves these details up to the compiler. Two compilers can produce different layouts for the same bit field struct. For this reason, do NOT use bit field structs to directly map to raw hardware register bytes or network packets if you need portability — use explicit masking and shifting instead (<code>reg |= (1 << 3)</code>). Bit fields are safe for internal data packing where you control both the definition and the compiler."
+                },
+                {
+                    title: "Flexible Array Members",
+                    content: "C99 introduced flexible array members: the last member of a struct can be an array with no specified size (<code>type name[];</code>). The struct itself doesn't allocate space for the array — you do, by allocating extra bytes when you malloc the struct. This lets you create variable-length structs with a single allocation instead of a struct plus a separate heap allocation for the data.",
+                    code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+ 
+// The struct has a header portion and a variable-length data tail
+typedef struct {
+    int  length;    // How many chars of data follow
+    char data[];    // Flexible array member — no size specified
+                    // sizeof(Message) does NOT include data[]
+} Message;
+ 
+Message *create_message(const char *text) {
+    int len = strlen(text);
+    // Allocate struct + enough extra bytes for the text + null terminator
+    Message *msg = malloc(sizeof(Message) + len + 1);
+    msg->length = len;
+    memcpy(msg->data, text, len + 1);
+    return msg;
+}
+ 
+int main() {
+    Message *m1 = create_message("Hello");
+    Message *m2 = create_message("A much longer message here");
+ 
+    printf("m1: length=%d, data='%s'\\n", m1->length, m1->data);
+    printf("m2: length=%d, data='%s'\\n", m2->length, m2->data);
+ 
+    printf("sizeof(Message) = %zu (header only, no data)\\n", sizeof(Message));
+ 
+    free(m1);
+    free(m2);
+    return 0;
+}`,
+                    output: "m1: length=5, data='Hello'\nm2: length=26, data='A much longer message here'\nsizeof(Message) = 4 (header only, no data)",
+                    tip: "The key advantage over a pointer member is the single allocation. A struct with <code>char *data</code> requires two mallocs and two frees. A struct with a flexible array member requires one malloc and one free — less overhead and better cache locality since the data is contiguous with the header. This pattern is used in the Linux kernel for variable-length network packets and inode structures."
                 }
             ]
         },

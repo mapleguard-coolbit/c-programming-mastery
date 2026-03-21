@@ -292,6 +292,77 @@ int main() {
             ]
         },
         {
+            id: "volatile",
+            title: "The volatile Keyword",
+            explanation: "The compiler is allowed to optimize your code. One optimization it loves is caching variable values in a CPU register instead of reading from memory every time. Usually this is great. But sometimes a variable can change outside the normal program flow — by hardware, by a signal handler, by another thread, or by the OS. In those cases the compiler's caching is catastrophically wrong. <code>volatile</code> is your way of telling the compiler: 'do not cache this variable, do not optimize away reads or writes, go to memory every single time.'",
+            sections: [
+                {
+                    title: "The Problem volatile Solves",
+                    content: "Without <code>volatile</code>, the compiler sees a variable that your code only ever reads without writing, and it thinks: 'this never changes, I'll just read it once and reuse the value from the register'. For normal variables this is a valid optimization. For variables that can change behind the compiler's back, this optimization produces a program that never sees the updated value — it sits in an infinite loop checking a stale cached copy.",
+                    code: `// WITHOUT volatile — the compiler may optimize this into
+// an infinite loop that never re-reads the flag from memory
+int done = 0;  // Set to 1 by a signal handler or hardware
+ 
+while (!done) {   // Compiler caches done=0, loops forever
+    // ... wait ...
+}
+ 
+// WITH volatile — the compiler must re-read from memory on every iteration
+volatile int done = 0;
+ 
+while (!done) {   // Re-reads from memory every iteration — correct
+    // ... wait ...
+}`
+                },
+                {
+                    title: "When to Use volatile",
+                    content: "The situations where <code>volatile</code> is required are specific and important. Using it everywhere 'just to be safe' is wrong — it disables optimizations for no reason. Use it only in these four scenarios.",
+                    points: [
+                        "<strong>Memory-mapped hardware registers:</strong> In embedded programming, hardware devices are controlled by writing to specific memory addresses. Those addresses can change state independently of your program. Every read and write must go to actual hardware, not a cached copy.",
+                        "<strong>Signal handlers:</strong> A variable shared between <code>main()</code> and a signal handler must be <code>volatile sig_atomic_t</code>. The signal can fire between any two instructions, and the handler modifies the variable — <code>volatile</code> ensures the change is visible.",
+                        "<strong>setjmp / longjmp:</strong> Local variables modified after a <code>setjmp</code> call must be <code>volatile</code> or they may revert to their pre-setjmp values after a <code>longjmp</code>.",
+                        "<strong>Polling flags across threads:</strong> Technically, <code>_Atomic</code> (C11) is the correct tool for this. But in older code, <code>volatile</code> was used to prevent the compiler from caching a flag that another thread sets."
+                    ],
+                    code: `#include <stdio.h>
+#include <signal.h>
+ 
+// Correct type for a flag shared with a signal handler
+volatile sig_atomic_t running = 1;
+ 
+void handle_sigint(int sig) {
+    (void)sig;
+    running = 0;  // Signal handler sets the flag
+}
+ 
+int main() {
+    signal(SIGINT, handle_sigint);
+ 
+    printf("Running. Press Ctrl+C to stop.\\n");
+ 
+    // Without volatile, the compiler might cache running=1
+    // and never re-check it, looping forever even after Ctrl+C
+    while (running) {
+        // doing work...
+    }
+ 
+    printf("Stopped cleanly.\\n");
+    return 0;
+}`,
+                    output: "Running. Press Ctrl+C to stop.\n[Ctrl+C pressed]\nStopped cleanly."
+                },
+                {
+                    title: "What volatile Does NOT Do",
+                    content: "It's critical to know what <code>volatile</code> doesn't guarantee, because it's commonly misunderstood.",
+                    points: [
+                        "<strong>It does NOT make operations atomic.</strong> <code>volatile int x = 0; x++;</code> is not thread-safe. The read-modify-write of <code>x++</code> can still be interrupted between the read and the write. Use <code>_Atomic</code> for thread safety.",
+                        "<strong>It does NOT prevent reordering between volatile and non-volatile accesses.</strong> The compiler guarantees the sequence of volatile accesses relative to each other, but not relative to non-volatile reads and writes.",
+                        "<strong>It does NOT replace mutexes.</strong> For proper multi-threaded synchronization, use <code>&lt;stdatomic.h&gt;</code> or <code>&lt;threads.h&gt;</code> mutexes."
+                    ],
+                    warning: "A very common mistake is using <code>volatile</code> for inter-thread communication in new code. C11's <code>_Atomic</code> keyword is the correct modern solution — it provides both the visibility guarantee AND atomicity. Use <code>volatile</code> only for the specific scenarios listed above (hardware registers, signal handlers, setjmp)."
+                }
+            ]
+        },
+        {
             id: "scope",
             title: "Scope, Lifetime, and assert()",
             explanation: "Scope is about visibility: from where in the code can a variable be seen? Lifetime is about time: how long does it exist in memory? These two concepts are related but distinct. We'll also cover <code>assert()</code> here — a debugging tool that checks invariants about your program's state and crashes loudly when they're violated.",
@@ -374,6 +445,293 @@ int main() {
 }`,
                     output: "10 / 2 = 5.0\nElement 2: 30",
                     tip: "Use <code>assert()</code> freely during development. If a function receives a NULL pointer it was never supposed to receive, that's a programming bug — not a runtime error the function should handle gracefully. Assert it. The crash and the message will immediately point you to the problem. This is far better than silently proceeding with bad data and crashing somewhere unrelated 200 lines later."
+                }
+            ]
+        },
+        {
+            id: "multi-file",
+            title: "Multi-File Programs and Header Files",
+            explanation: "Every program so far has been a single <code>.c</code> file. Real programs are not. A production codebase might have hundreds of <code>.c</code> files, each responsible for one area of functionality. C's mechanism for splitting a program across multiple files is simple but has rules that bite hard when ignored. Understanding how translation units, <code>extern</code>, and header files work is what lets you write code that scales beyond one file.",
+            sections: [
+                {
+                    title: "Translation Units",
+                    content: "The C compiler processes one <code>.c</code> file at a time. Each file it processes is called a <strong>translation unit</strong>. The compiler has no idea what's in your other <code>.c</code> files while it's compiling any particular one. It only knows about functions and variables you've declared visible to it. This is why you get 'implicit declaration of function' warnings — the compiler hit a function call before seeing any declaration of that function.",
+                    points: [
+                        "Each <code>.c</code> file compiles independently into an object file (<code>.o</code>).",
+                        "The linker then stitches all the object files together into the final executable.",
+                        "A function defined in <code>math_utils.c</code> is invisible to <code>main.c</code> unless you tell <code>main.c</code> it exists."
+                    ]
+                },
+                {
+                    title: "extern: Sharing Variables Across Files",
+                    content: "A global variable defined in one <code>.c</code> file is not automatically visible in another. The <code>extern</code> keyword says 'this variable exists and is defined somewhere else — don't allocate storage for it here, just let me use it'. The linker resolves the reference at link time.",
+                    code: `// --- config.c ---
+// This DEFINES the variable (allocates storage)
+int max_connections = 100;
+ 
+ 
+// --- server.c ---
+// This DECLARES it with extern (no storage, just a reference)
+extern int max_connections;
+ 
+void start_server() {
+    // Now we can use it
+    printf("Max connections: %d\\n", max_connections);
+}`,
+                    warning: "A common mistake is defining a variable in a header file without <code>extern</code>. Every <code>.c</code> file that includes the header will define its own separate copy of the variable. The linker will throw a 'multiple definition' error — or worse, on some compilers it silently picks one and discards the others."
+                },
+                {
+                    title: "Header Files (.h): The Interface Contract",
+                    content: "A header file is just a text file with a <code>.h</code> extension that you <code>#include</code> into your <code>.c</code> files. The preprocessor literally pastes its contents in. Convention is to put into headers: function prototypes, struct definitions, typedefs, constants, and <code>extern</code> declarations — anything that needs to be visible to multiple files. The actual function bodies go in the corresponding <code>.c</code> file.",
+                    code: `// --- math_utils.h ---
+#ifndef MATH_UTILS_H   // Include guard (explained below)
+#define MATH_UTILS_H
+ 
+// Function prototypes — just the signature, no body
+int  add(int a, int b);
+int  multiply(int a, int b);
+void print_result(int result);
+ 
+// Shared constant
+#define MAX_VALUE 1000
+ 
+#endif // MATH_UTILS_H
+ 
+ 
+// --- math_utils.c ---
+#include <stdio.h>
+#include "math_utils.h"  // Include own header (catches mismatches)
+ 
+int add(int a, int b) {
+    return a + b;
+}
+ 
+int multiply(int a, int b) {
+    return a * b;
+}
+ 
+void print_result(int result) {
+    printf("Result: %d\\n", result);
+}
+ 
+ 
+// --- main.c ---
+#include "math_utils.h"  // Get the prototypes
+ 
+int main() {
+    int sum = add(10, 20);
+    int product = multiply(5, 6);
+    print_result(sum);
+    print_result(product);
+    return 0;
+}
+ 
+ 
+// --- Compile both .c files together ---
+// gcc main.c math_utils.c -o program`,
+                    output: "Result: 30\nResult: 30"
+                },
+                {
+                    title: "Include Guards: Preventing Double-Inclusion",
+                    content: "If <code>main.c</code> includes both <code>a.h</code> and <code>b.h</code>, and both of those include <code>types.h</code>, then <code>types.h</code> gets pasted into <code>main.c</code> twice. This causes 'redefinition' errors for every struct and typedef in it. Include guards solve this with a simple pattern: a preprocessor macro that's defined on first inclusion and checked on every subsequent one.",
+                    code: `// Every header file you write should start and end with this pattern.
+// The macro name MUST be unique — convention is FILENAME_H in all caps.
+ 
+#ifndef MY_HEADER_H   // "If MY_HEADER_H is not yet defined..."
+#define MY_HEADER_H   // "...define it now (marking this header as included)..."
+ 
+// ... all your declarations go here ...
+ 
+#endif               // "End of the guarded block."
+ 
+// The second time this header is #include'd, MY_HEADER_H is already
+// defined, so the preprocessor skips everything between #ifndef and #endif.`,
+                    tip: "Modern compilers also support <code>#pragma once</code> at the top of a header as a simpler alternative to the ifndef/define/endif guard pattern. It's not part of the C standard, but it works on every major compiler (GCC, Clang, MSVC). For maximum portability, stick to the traditional guard pattern. For personal projects, <code>#pragma once</code> is fine and less boilerplate."
+                },
+                {
+                    title: "static for File-Scope Encapsulation",
+                    content: "A global variable or function declared <code>static</code> at file scope is invisible outside that translation unit. The linker cannot see it, and other <code>.c</code> files cannot reference it. This is how you 'hide' internal implementation details — anything that's an internal helper and shouldn't be part of the public interface should be <code>static</code>.",
+                    code: `// --- counter.c ---
+ 
+// Private: only visible inside counter.c
+static int count = 0;
+ 
+// Private helper function
+static void log_change(int old, int new) {
+    printf("Count changed: %d -> %d\\n", old, new);
+}
+ 
+// Public: visible to other files (no static)
+void increment() {
+    int old = count;
+    count++;
+    log_change(old, count);
+}
+ 
+int get_count() {
+    return count;
+}
+ 
+// --- main.c ---
+// extern int count;    // LINKER ERROR: 'count' is static, invisible
+// log_change(1, 2);    // LINKER ERROR: 'log_change' is static, invisible
+// increment();         // Fine: increment() is public
+// get_count();         // Fine: get_count() is public`
+                }
+            ]
+        },
+        {
+            id: "goto",
+            title: "goto and Labels",
+            explanation: "<code>goto</code> is C's unconditional jump. It transfers execution directly to a labelled statement anywhere within the same function. It is the most controversial statement in C — Dijkstra's 1968 letter 'Go To Statement Considered Harmful' made it radioactive in academic circles. But reality is more nuanced: <code>goto</code> in C has one genuinely legitimate, widely-used pattern, and it's worth knowing.",
+            sections: [
+                {
+                    title: "The Syntax",
+                    content: "A label is just an identifier followed by a colon. You can put a label before any statement in a function. <code>goto label_name;</code> immediately transfers execution to that label. The label and the <code>goto</code> must be in the same function — you cannot jump between functions.",
+                    code: `#include <stdio.h>
+ 
+int main() {
+    int i = 0;
+ 
+top:               // This is a label
+    if (i < 5) {
+        printf("%d\\n", i);
+        i++;
+        goto top;  // Jump back to the label
+    }
+ 
+    return 0;
+}`,
+                    output: "0\n1\n2\n3\n4",
+                    warning: "The example above uses goto to implement a loop. This is the wrong use of goto — just write a while loop. It exists only to illustrate the syntax. The legitimate use of goto is below."
+                },
+                {
+                    title: "The One Legitimate Pattern: Error Cleanup",
+                    content: "In C, functions that acquire multiple resources (open files, allocate memory, lock mutexes) in sequence need to release them all on any error path. Without goto, this leads to deeply nested if-else chains or copy-pasted cleanup code. The <code>goto cleanup</code> pattern is the idiomatic C solution: one cleanup block at the bottom, jumped to from any error point. This pattern is used throughout the Linux kernel.",
+                    code: `#include <stdio.h>
+#include <stdlib.h>
+ 
+int process_files(const char *file1, const char *file2) {
+    FILE *f1 = NULL;
+    FILE *f2 = NULL;
+    int  *buf = NULL;
+    int   result = -1;  // Assume failure
+ 
+    f1 = fopen(file1, "r");
+    if (!f1) {
+        perror("fopen file1");
+        goto cleanup;      // Jump straight to cleanup
+    }
+ 
+    f2 = fopen(file2, "w");
+    if (!f2) {
+        perror("fopen file2");
+        goto cleanup;      // f1 is open, cleanup will close it
+    }
+ 
+    buf = malloc(1024);
+    if (!buf) {
+        perror("malloc");
+        goto cleanup;      // f1 and f2 are open, cleanup handles both
+    }
+ 
+    // ... actual work here ...
+    result = 0;  // Success
+ 
+cleanup:
+    // Safe to call free/fclose on NULL — they do nothing
+    free(buf);
+    if (f2) fclose(f2);
+    if (f1) fclose(f1);
+    return result;
+}`,
+                    tip: "The goto cleanup pattern has these properties that make it acceptable: the jump is always forward (downward in the file), never backward; there is exactly one cleanup block; and it eliminates the deeply nested if-else pyramid that the alternative produces. If you see this pattern in production C code, this is why it's there — not because the author didn't know how to write a loop."
+                },
+                {
+                    title: "The Rules and Restrictions",
+                    content: "C places strict limits on where you can jump with goto.",
+                    points: [
+                        "<strong>Same function only.</strong> You cannot goto a label in a different function.",
+                        "<strong>You cannot jump over a variable initialization into its scope.</strong> Jumping to a label after a variable declaration but before its initializer would leave the variable uninitialized. The compiler prevents this.",
+                        "<strong>You cannot jump into a block.</strong> You can jump out of blocks (common in nested loop breaking), but jumping into the middle of a block from outside is not allowed."
+                    ]
+                }
+            ]
+        },
+        {
+            id: "vla-compound",
+            title: "Variable Length Arrays and Compound Literals",
+            explanation: "Two C99 features that are genuinely useful but often missing from tutorials. Variable Length Arrays (VLAs) let you create stack arrays whose size is determined at runtime instead of compile time. Compound literals let you create temporary unnamed objects inline — arrays and structs without declaring a named variable. Both are part of the language, both appear in real code, and both have important caveats.",
+            sections: [
+                {
+                    title: "Variable Length Arrays (VLAs)",
+                    content: "Before C99, every array's size had to be a compile-time constant. If the user inputs a number N and you want an array of N integers, you had to either malloc it or declare an array large enough for the worst case and waste memory. C99 introduced VLAs: arrays whose size is an integer expression evaluated at runtime. The array still lives on the stack, is still destroyed when the function returns, and is still not bounds-checked — it just has a runtime-determined size.",
+                    code: `#include <stdio.h>
+ 
+// Traditional: fixed size, always wastes memory if n is small
+// int buffer[1024];  
+ 
+// With VLA: allocate exactly what's needed, on the stack
+void process(int n) {
+    int data[n];   // Size is n, determined at runtime
+ 
+    for (int i = 0; i < n; i++) {
+        data[i] = i * i;
+    }
+    for (int i = 0; i < n; i++) {
+        printf("%d ", data[i]);
+    }
+    printf("\\n");
+}
+ 
+int main() {
+    int size;
+    printf("How many squares? ");
+    scanf("%d", &size);
+    process(size);
+    return 0;
+}`,
+                    output: "How many squares? 6\n0 1 4 9 16 25",
+                    warning: "VLAs have serious caveats. First: stack space is limited (typically 1-8 MB). A large VLA can cause a stack overflow with no warning whatsoever — just a crash. For anything larger than a few kilobytes, malloc instead. Second: VLAs are optional in C11 and later (the standard made them optional for embedded targets). Check <code>__STDC_NO_VLA__</code> if portability matters. Third: you cannot use <code>sizeof</code> on a VLA at compile time — sizeof on a VLA is evaluated at runtime."
+                },
+                {
+                    title: "Compound Literals",
+                    content: "A compound literal creates a nameless, temporary object of a specified type. The syntax looks like a cast followed by a brace-enclosed initializer: <code>(Type){initializer list}</code>. The result is an lvalue — you can take its address. Compound literals are useful for passing struct or array arguments directly without declaring a throw-away named variable.",
+                    code: `#include <stdio.h>
+ 
+typedef struct { int x; int y; } Point;
+ 
+// Function expecting a Point by value
+void print_point(Point p) {
+    printf("(%d, %d)\\n", p.x, p.y);
+}
+ 
+// Function expecting an int array and size
+void print_array(int *arr, int n) {
+    for (int i = 0; i < n; i++) printf("%d ", arr[i]);
+    printf("\\n");
+}
+ 
+int main() {
+    // Without compound literal: need a named variable
+    Point tmp = {3, 4};
+    print_point(tmp);
+ 
+    // With compound literal: pass directly, no named variable needed
+    print_point((Point){7, 8});
+ 
+    // Compound literal for an array
+    print_array((int[]){10, 20, 30, 40}, 4);
+ 
+    // Pointer to a compound literal — the literal has the
+    // lifetime of the enclosing block (local scope)
+    Point *p = &(Point){5, 6};
+    printf("Via pointer: (%d, %d)\\n", p->x, p->y);
+ 
+    return 0;
+}`,
+                    output: "(3, 4)\n(7, 8)\n10 20 30 40 \nVia pointer: (5, 6)",
+                    tip: "Compound literals are especially useful in test code and in functions that require a struct argument you only need once. Instead of declaring a named variable just to fill it and pass it, the compound literal keeps the data right at the call site. They also combine well with designated initializers: <code>print_point((Point){.y = 10, .x = 5});</code>"
                 }
             ]
         },

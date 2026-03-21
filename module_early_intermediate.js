@@ -553,6 +553,87 @@ int main() {
             ]
         },
         {
+            id: "stdint",
+            title: "Fixed-Width Integer Types: <stdint.h>",
+            explanation: "C's built-in integer types have a dirty secret: their sizes are not guaranteed. An <code>int</code> is 'at least 16 bits' — on your desktop that's 4 bytes, but on certain microcontrollers it's 2. If your code silently assumes 32-bit ints and gets compiled on a different target, you have a bug that only surfaces in production on a different machine. <code>&lt;stdint.h&gt;</code> (C99) solves this by giving you types with exact, guaranteed sizes on every platform.",
+            sections: [
+                {
+                    title: "The Problem With Native Types",
+                    content: "The C standard only mandates minimum sizes, not exact ones. This is a portability trap for anyone writing network protocols, binary file formats, hardware drivers, or cryptography — basically anyone doing real work.",
+                    points: [
+                        "<code>int</code> on a 32-bit desktop: 4 bytes. <code>int</code> on some embedded targets: 2 bytes. Same code, completely different range and overflow behavior.",
+                        "The safest rule: use native types (<code>int</code>, <code>long</code>) only for things where the exact size genuinely doesn't matter, like loop counters. For everything else, use fixed-width types."
+                    ]
+                },
+                {
+                    title: "The Fixed-Width Types",
+                    content: "Include <code>&lt;stdint.h&gt;</code>. The naming convention is: <code>int</code> or <code>uint</code>, number of bits, <code>_t</code>. Signed variants can hold negative numbers; unsigned cannot, but have double the positive range.",
+                    points: [
+                        "<code>int8_t</code> / <code>uint8_t</code>: Exactly 8 bits. Signed: -128 to 127. Unsigned: 0 to 255. This is one byte.",
+                        "<code>int16_t</code> / <code>uint16_t</code>: Exactly 16 bits. Signed: -32,768 to 32,767.",
+                        "<code>int32_t</code> / <code>uint32_t</code>: Exactly 32 bits. Signed: ±2.1 billion. This is what most people think <code>int</code> is.",
+                        "<code>int64_t</code> / <code>uint64_t</code>: Exactly 64 bits. Signed: ±9.2 quintillion. Use this for large counters, timestamps, file offsets.",
+                        "<code>intptr_t</code> / <code>uintptr_t</code>: Wide enough to hold a pointer on the current platform. Useful when you need to store a pointer in an integer."
+                    ],
+                    code: `#include <stdio.h>
+#include <stdint.h>
+ 
+int main() {
+    int8_t   a = 127;          // max signed 8-bit
+    uint8_t  b = 255;          // max unsigned 8-bit
+    int32_t  c = -2147483648;  // min signed 32-bit
+    uint64_t d = 18446744073709551615ULL; // max unsigned 64-bit
+ 
+    printf("int8_t  size: %zu bytes, value: %d\\n",  sizeof(a), a);
+    printf("uint8_t size: %zu bytes, value: %u\\n",  sizeof(b), b);
+    printf("int32_t size: %zu bytes, value: %d\\n",  sizeof(c), c);
+    printf("uint64_t size: %zu bytes, value: %llu\\n", sizeof(d), d);
+ 
+    return 0;
+}`,
+                    output: "int8_t  size: 1 bytes, value: 127\nuint8_t size: 1 bytes, value: 255\nint32_t size: 4 bytes, value: -2147483648\nuint64_t size: 8 bytes, value: 18446744073709551615"
+                },
+                {
+                    title: "The Minimum-Width and Fast Types",
+                    content: "<code>&lt;stdint.h&gt;</code> also provides two additional families you'll see in real codebases. The 'least' types give you the smallest type that's at least N bits — useful when you want to save memory but need a guaranteed minimum. The 'fast' types give you the fastest type that's at least N bits — useful for performance-critical counters.",
+                    points: [
+                        "<code>int_least8_t</code>, <code>int_least16_t</code>, etc: Smallest type with at least that many bits. Guaranteed to exist on every platform.",
+                        "<code>int_fast8_t</code>, <code>int_fast16_t</code>, etc: Fastest integer type with at least that many bits. On a 64-bit CPU, <code>int_fast16_t</code> might actually be 64 bits because 64-bit operations are faster than 16-bit ones.",
+                        "<code>intmax_t</code> / <code>uintmax_t</code>: The largest integer type the platform supports."
+                    ],
+                    code: `#include <stdio.h>
+#include <stdint.h>
+ 
+// Typical use: a network packet header where field sizes are fixed by the protocol
+typedef struct {
+    uint8_t  version;    // always 1 byte
+    uint8_t  flags;      // always 1 byte
+    uint16_t length;     // always 2 bytes
+    uint32_t sequence;   // always 4 bytes
+} PacketHeader;
+ 
+int main() {
+    PacketHeader pkt = {
+        .version  = 2,
+        .flags    = 0b00000101,
+        .length   = 1024,
+        .sequence = 99999
+    };
+ 
+    printf("Version:  %u\\n",  pkt.version);
+    printf("Flags:    0x%02X\\n", pkt.flags);
+    printf("Length:   %u\\n",  pkt.length);
+    printf("Sequence: %u\\n",  pkt.sequence);
+    printf("Header size: %zu bytes\\n", sizeof(PacketHeader));
+ 
+    return 0;
+}`,
+                    output: "Version:  2\nFlags:    0x05\nLength:   1024\nSequence: 99999\nHeader size: 8 bytes",
+                    tip: "For format specifiers with fixed-width types, <code>&lt;inttypes.h&gt;</code> provides portable macros like <code>PRId32</code> and <code>PRIu64</code>. Use them in printf: <code>printf(\"%\" PRId32 \"\\n\", myInt32)</code>. Without these, the correct specifier for <code>int32_t</code> varies by platform — using <code>%d</code> works on most 32-bit systems but is technically wrong on others."
+                }
+            ]
+        },
+        {
             id: "random",
             title: "Random Numbers",
             explanation: "Generating random numbers is one of the first things most programmers want to do — games, simulations, shuffling, sampling. C provides basic random number generation through <code>&lt;stdlib.h&gt;</code>. The mechanism is simple: a pseudo-random number generator (PRNG) that produces a long sequence of numbers that appear random but are completely deterministic given the same starting point (the seed).",
