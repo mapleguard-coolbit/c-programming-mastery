@@ -32,7 +32,7 @@ int main() {
                 },
                 {
                     title: "Comments",
-                    content: "Comments are text in your source code that the compiler completely ignores. They exist purely for humans — to explain what code does, leave notes for yourself, or temporarily disable a line without deleting it. In a language as terse as C, good comments are the difference between readable code and archaeology.",
+                    content: "Comments are text in your source code that the compiler completely ignores. They exist purely for humans — to explain what code does, leave notes for yourself, or temporarily disable a line without deleting it. In a language as smooth as C, good comments are the difference between readable code and archaeology.",
                     points: [
                         "<strong>Single-line comment</strong>: Start with <code>//</code>. Everything from those two slashes to the end of the line is ignored by the compiler. This is the comment style you'll use 90% of the time.",
                         "<strong>Multi-line comment</strong>: Start with <code>/*</code> and end with <code>*/</code>. Everything between them is ignored, even if it spans many lines. Useful for temporarily blocking out a large section of code or writing longer explanations.",
